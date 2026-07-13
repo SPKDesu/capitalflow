@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CapitalFlow - บันทึกรายจ่าย</title>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -161,31 +160,9 @@
 
   <script>
     // ==========================================
-    // ตั้งค่าต่างๆ
+    // ตั้งค่า URL ของ Google Apps Script
     // ==========================================
-    const LIFF_ID = '2010692516-e05uuk6k';
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXjfrF4Wh1U5mqxXPlf0r-gwu0edEbHENQSA06O-h4skR3oByW32A36kgnkplhY6eaqQ/exec';
-
-    // ==========================================
-    // LIFF Initialization
-    // ==========================================
-    let liffReady = false;
-
-    async function initializeLiff() {
-      try {
-        await liff.init({ liffId: LIFF_ID });
-        liffReady = true;
-        if (!liff.isLoggedIn()) {
-          liff.login();
-        }
-      } catch (err) {
-        alert('LIFF init error: ' + err.message);
-        console.error('LIFF init failed:', err);
-        // ถ้าเปิดบนเบราว์เซอร์ปกติ (ไม่ผ่าน LINE) ก็ยังใช้ฟอร์มได้
-        liffReady = false;
-      }
-    }
-    initializeLiff();
 
     // ==========================================
     // ตั้งค่าวันปัจจุบัน
@@ -249,42 +226,15 @@
         status.style.display = 'block';
         btn.textContent = 'บันทึกเรียบร้อย';
 
-        // ส่งข้อความสรุปเข้าแชท LINE
-        if (liffReady) {
-          if (liff.isLoggedIn()) {
-            liff.sendMessages([
-              {
-                type: 'text',
-                text: '📝 บันทึกรายจ่าย\nรายการ: ' + data.item + '\nหมวดหมู่: ' + data.category + '\nจำนวน: ' + data.amount + ' บาท'
-              }
-            ]).then(function() {
-              liff.closeWindow();
-            }).catch(function(err) {
-              alert('Error: ' + err.message);
-              if (err.message.toLowerCase().includes('revoke') || err.message.toLowerCase().includes('permission')) {
-                alert('ระบบกำลังรีเซ็ตการล็อกอิน กรุณากดยืนยันสิทธิ์อีกครั้งครับ');
-                liff.logout();
-                liff.login();
-              } else {
-                console.error('sendMessages error:', err);
-                setTimeout(function() { liff.closeWindow(); }, 1500);
-              }
-            });
-          } else {
-            alert('LIFF Not Logged In!');
-          }
-        } else {
-          alert('LIFF SDK Not Ready!');
-          // กรณีเปิดบนเบราว์เซอร์ปกติ (ไม่ผ่าน LINE)
-          setTimeout(function() {
-            document.getElementById('expenseForm').reset();
-            document.getElementById('date').valueAsDate = new Date();
-            typeSelect.dispatchEvent(new Event('change'));
-            status.style.display = 'none';
-            btn.textContent = 'บันทึกข้อมูล';
-            btn.disabled = false;
-          }, 2000);
-        }
+        // รีเซ็ตฟอร์มหลังจากผ่านไป 2 วินาที
+        setTimeout(function() {
+          document.getElementById('expenseForm').reset();
+          document.getElementById('date').valueAsDate = new Date();
+          typeSelect.dispatchEvent(new Event('change'));
+          status.style.display = 'none';
+          btn.textContent = 'บันทึกข้อมูล';
+          btn.disabled = false;
+        }, 2000);
       })
       .catch(function(error) {
         alert('เกิดข้อผิดพลาด: ' + error.message);
