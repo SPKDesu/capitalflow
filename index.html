@@ -258,12 +258,17 @@
                 text: '📝 บันทึกรายจ่าย\nรายการ: ' + data.item + '\nหมวดหมู่: ' + data.category + '\nจำนวน: ' + data.amount + ' บาท'
               }
             ]).then(function() {
-              alert('ส่งข้อความสำเร็จ!');
               liff.closeWindow();
             }).catch(function(err) {
-              alert('sendMessages Error: ' + err.message);
-              console.error('sendMessages error:', err);
-              setTimeout(function() { liff.closeWindow(); }, 1500);
+              alert('Error: ' + err.message);
+              if (err.message.toLowerCase().includes('revoke') || err.message.toLowerCase().includes('permission')) {
+                alert('ระบบกำลังรีเซ็ตการล็อกอิน กรุณากดยืนยันสิทธิ์อีกครั้งครับ');
+                liff.logout();
+                liff.login();
+              } else {
+                console.error('sendMessages error:', err);
+                setTimeout(function() { liff.closeWindow(); }, 1500);
+              }
             });
           } else {
             alert('LIFF Not Logged In!');
