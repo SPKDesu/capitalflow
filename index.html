@@ -243,6 +243,28 @@
       'ลงทุน': ['เงินลงทุน']
     };
 
+    catSelect.addEventListener('change', function(e) {
+      var cat = e.target.value;
+      var itemInput = document.getElementById('item');
+      var freqSelect = document.getElementById('frequency');
+      
+      const autoItemCats = ['อาหาร', 'เครื่องดื่ม', 'ขนม', 'น้ำมัน', 'เน็ต', 'ตัดผม'];
+      if (autoItemCats.includes(cat)) {
+        itemInput.value = cat;
+      } else {
+        if (autoItemCats.includes(itemInput.value)) {
+          itemInput.value = '';
+        }
+      }
+      
+      const fixedCats = ['เน็ต', 'บริการสตีมมิ่ง', 'รายได้คงที่', 'เงินออมฉุกเฉิน', 'เงินลงทุน'];
+      if (fixedCats.includes(cat)) {
+        freqSelect.value = 'คงที่';
+      } else {
+        freqSelect.value = 'ทั่วไป';
+      }
+    });
+
     typeSelect.addEventListener('change', function(e) {
       var type = e.target.value;
       catSelect.innerHTML = '';
@@ -252,7 +274,11 @@
         option.textContent = cat;
         catSelect.appendChild(option);
       });
+      catSelect.dispatchEvent(new Event('change'));
     });
+    
+    // Initialize category bindings
+    catSelect.dispatchEvent(new Event('change'));
 
     // ==========================================
     // ส่งข้อมูลฟอร์ม
