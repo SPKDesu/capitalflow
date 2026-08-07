@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CapitalFlow - บันทึกรายจ่าย</title>
+  <title>CapitalFlow - บันทึกการเงินด่วน</title>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -13,13 +13,14 @@
       --text-muted: #94a3b8;
       --accent: #3b82f6;
       --accent-hover: #2563eb;
+      --accent-purple: #a855f7;
       --border: rgba(255,255,255,0.1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
-      padding: 1.5rem;
+      padding: 1.2rem;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -27,7 +28,7 @@
     }
     .container {
       width: 100%;
-      max-width: 400px;
+      max-width: 440px;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 20px;
@@ -38,58 +39,100 @@
     h1 {
       font-size: 1.5rem;
       text-align: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.2rem;
       font-weight: 600;
       background: linear-gradient(135deg, #60a5fa, #a855f7);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .form-group { margin-bottom: 1.2rem; }
+
+    /* Tab Switcher Styles */
+    .tab-nav {
+      display: flex;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 4px;
+      border-radius: 14px;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 0.65rem 0.5rem;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 500;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .form-group { margin-bottom: 1.1rem; }
+    .form-row { display: flex; gap: 0.75rem; }
+    .form-row .form-group { flex: 1; }
+    
     label {
       display: block;
       font-size: 0.85rem;
       color: var(--text-muted);
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.35rem;
     }
     input, select {
       width: 100%;
-      padding: 0.75rem 1rem;
+      padding: 0.75rem 0.9rem;
       border-radius: 12px;
       border: 1px solid var(--border);
       background: rgba(15, 23, 42, 0.6);
       color: var(--text-main);
-      font-size: 1rem;
+      font-size: 0.95rem;
       outline: none;
       transition: all 0.2s;
       appearance: none;
     }
+    input[readonly] {
+      background: rgba(15, 23, 42, 0.3);
+      color: #60a5fa;
+      font-weight: 600;
+    }
     select {
       background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
       background-repeat: no-repeat;
-      background-position: right 1rem top 50%;
+      background-position: right 0.8rem top 50%;
       background-size: 0.65rem auto;
     }
     input:focus, select:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
     }
-    button {
+    button.btn-submit {
       width: 100%;
-      padding: 1rem;
+      padding: 0.95rem;
       border: none;
       border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent), #a855f7);
+      background: linear-gradient(135deg, var(--accent), var(--accent-purple));
       color: white;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 600;
       cursor: pointer;
       box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-      transition: transform 0.2s;
+      transition: transform 0.2s, opacity 0.2s;
       margin-top: 0.5rem;
     }
-    button:active { transform: scale(0.98); }
-    button:disabled { opacity: 0.7; cursor: not-allowed; }
-    #status {
+    button.btn-submit:active { transform: scale(0.98); }
+    button.btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+    
+    .status-msg {
       text-align: center;
       margin-top: 1rem;
       font-size: 0.95rem;
@@ -98,16 +141,18 @@
       font-weight: 500;
     }
     
+    /* Tab content toggle */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
     /* Modal styles */
     .modal {
       display: none;
       position: fixed;
       z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0,0,0,0.6);
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.65);
       backdrop-filter: blur(5px);
       align-items: center;
       justify-content: center;
@@ -116,9 +161,9 @@
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 20px;
-      padding: 2rem;
+      padding: 1.8rem;
       width: 90%;
-      max-width: 350px;
+      max-width: 360px;
       text-align: center;
       box-shadow: 0 15px 30px rgba(0,0,0,0.5);
       animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -127,10 +172,10 @@
       0% { transform: scale(0.8); opacity: 0; }
       100% { transform: scale(1); opacity: 1; }
     }
-    .modal-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .modal-icon { font-size: 3rem; margin-bottom: 0.8rem; }
     .modal-content h2 {
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
+      font-size: 1.35rem;
+      margin-bottom: 0.8rem;
       background: linear-gradient(135deg, #34d399, #10b981);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -140,74 +185,153 @@
       background: rgba(15, 23, 42, 0.6);
       padding: 1rem;
       border-radius: 12px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.2rem;
       color: var(--text-main);
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       line-height: 1.6;
     }
-    .close-btn { margin-top: 0; }
+    .close-btn { width: 100%; padding: 0.8rem; border-radius: 12px; border: none; background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
+
+    /* PIN Modal */
+    .pin-input {
+      letter-spacing: 0.5rem;
+      font-size: 1.5rem;
+      text-align: center;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>บันทึกรายการด่วน</h1>
-    <form id="expenseForm">
-      <div class="form-group">
-        <label>วันที่ (Date)</label>
-        <input type="date" id="date" required>
-      </div>
-      
-      <div class="form-group" style="display: flex; gap: 1rem;">
-        <div style="flex: 1;">
-          <label>ประเภท (Type)</label>
-          <select id="type" required>
-            <option value="รายจ่าย">รายจ่าย</option>
-            <option value="รายได้">รายได้</option>
-            <option value="เงินออม">เงินออม</option>
-            <option value="ลงทุน">ลงทุน</option>
+    <h1>CapitalFlow</h1>
+    
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button type="button" class="tab-btn active" id="tab-expense-btn" onclick="switchTab('expense')">
+        📝 <span>รายจ่ายด่วน</span>
+      </button>
+      <button type="button" class="tab-btn" id="tab-installment-btn" onclick="switchTab('installment')">
+        💳 <span>ผ่อนชำระ</span>
+      </button>
+    </div>
+
+    <!-- Tab 1: บันทึกรายจ่ายด่วน -->
+    <div id="expense-tab-content" class="tab-content active">
+      <form id="expenseForm">
+        <div class="form-group">
+          <label>วันที่ (Date)</label>
+          <input type="date" id="date" required>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>ประเภท (Type)</label>
+            <select id="type" required>
+              <option value="รายจ่าย">รายจ่าย</option>
+              <option value="รายได้">รายได้</option>
+              <option value="เงินออม">เงินออม</option>
+              <option value="ลงทุน">ลงทุน</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>ความถี่ (Freq)</label>
+            <select id="frequency" required>
+              <option value="ทั่วไป">ทั่วไป</option>
+              <option value="คงที่">คงที่</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>หมวดหมู่ (Category)</label>
+          <select id="category" required>
+            <option value="อาหาร">อาหาร</option>
+            <option value="เครื่องดื่ม">เครื่องดื่ม</option>
+            <option value="ขนม">ขนม</option>
+            <option value="น้ำมัน">น้ำมัน</option>
+            <option value="เน็ต">เน็ต</option>
+            <option value="บริการสตีมมิ่ง">บริการสตีมมิ่ง</option>
+            <option value="เครื่องสำอาง">เครื่องสำอาง</option>
+            <option value="ตัดผม">ตัดผม</option>
+            <option value="บำรุงรถ">บำรุงรถ</option>
+            <option value="รายจ่ายอื่น ๆ">รายจ่ายอื่น ๆ</option>
           </select>
         </div>
-        <div style="flex: 1;">
-          <label>ความถี่ (Freq)</label>
-          <select id="frequency" required>
-            <option value="ทั่วไป">ทั่วไป</option>
-            <option value="คงที่">คงที่</option>
-          </select>
+        
+        <div class="form-group">
+          <label>รายการ (Item Name)</label>
+          <input type="text" id="item" placeholder="เช่น ชาไข่มุก, ข้าวผัด" required autocomplete="off">
         </div>
-      </div>
-      
-      <div class="form-group">
-        <label>หมวดหมู่ (Category)</label>
-        <select id="category" required>
-          <option value="อาหาร">อาหาร</option>
-          <option value="เครื่องดื่ม">เครื่องดื่ม</option>
-          <option value="ขนม">ขนม</option>
-          <option value="น้ำมัน">น้ำมัน</option>
-          <option value="เน็ต">เน็ต</option>
-          <option value="บริการสตีมมิ่ง">บริการสตีมมิ่ง</option>
-          <option value="เครื่องสำอาง">เครื่องสำอาง</option>
-          <option value="ตัดผม">ตัดผม</option>
-          <option value="บำรุงรถ">บำรุงรถ</option>
-          <option value="รายจ่ายอื่น ๆ">รายจ่ายอื่น ๆ</option>
-        </select>
-      </div>
-      
-      <div class="form-group">
-        <label>รายการ (Item Name)</label>
-        <input type="text" id="item" placeholder="เช่น ชาไข่มุก, ข้าวผัด" required autocomplete="off">
-      </div>
-      
-      <div class="form-group">
-        <label>จำนวนเงิน (Amount)</label>
-        <input type="number" id="amount" placeholder="0.00" step="0.01" required>
-      </div>
-      
-      <button type="submit" id="submitBtn">บันทึกข้อมูล</button>
-      <div id="status">✅ บันทึกสำเร็จแล้ว!</div>
-    </form>
+        
+        <div class="form-group">
+          <label>จำนวนเงิน (Amount)</label>
+          <input type="number" id="amount" placeholder="0.00" step="0.01" required>
+        </div>
+        
+        <button type="submit" class="btn-submit" id="submitBtn">บันทึกรายจ่าย</button>
+        <div id="status" class="status-msg">✅ บันทึกสำเร็จแล้ว!</div>
+      </form>
+    </div>
+
+    <!-- Tab 2: บันทึกรายการผ่อนชำระ (Installment) -->
+    <div id="installment-tab-content" class="tab-content">
+      <form id="installmentForm">
+        <div class="form-group">
+          <label>วันที่ทำรายการ (Date)</label>
+          <input type="date" id="inst_date" required>
+        </div>
+
+        <div class="form-group">
+          <label>ชื่อสินค้า / รายการ (Item Name)</label>
+          <input type="text" id="inst_item" placeholder="เช่น iPhone 15 Pro, เครื่องซักผ้า" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label>ผู้ให้บริการ / บัตร (Source)</label>
+          <input type="text" id="inst_source" placeholder="เช่น Shopee PayLater, KTC, KBank" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>ราคารวม (THB)</label>
+            <input type="number" step="0.01" id="inst_total" placeholder="0.00" oninput="calculateInstallment()" required>
+          </div>
+          <div class="form-group">
+            <label>จำนวนเดือน (Months)</label>
+            <input type="number" id="inst_months" placeholder="10" min="1" oninput="calculateInstallment()" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>ดอกเบี้ย % (Interest)</label>
+            <input type="number" step="0.01" id="inst_interest" placeholder="0.00" value="0" oninput="calculateInstallment()" required>
+          </div>
+          <div class="form-group">
+            <label>เดือนเริ่มผ่อน (Start Month)</label>
+            <input type="month" id="inst_start" onchange="calculateInstallment()" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>เดือนสิ้นสุด (End Month)</label>
+            <input type="text" id="inst_end" readonly placeholder="YYYY-MM">
+          </div>
+          <div class="form-group">
+            <label>ค่างวด/เดือน (THB)</label>
+            <input type="text" id="inst_monthly" readonly placeholder="0.00">
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="instSubmitBtn">บันทึกรายการผ่อน</button>
+        <div id="instStatus" class="status-msg">✅ บันทึกผ่อนชำระสำเร็จ!</div>
+      </form>
+    </div>
   </div>
 
-  <!-- Popup Modal -->
+  <!-- Summary Modal -->
   <div id="summaryModal" class="modal">
     <div class="modal-content">
       <div class="modal-icon">✅</div>
@@ -215,7 +339,18 @@
       <div class="modal-details" id="summaryDetails">
         <!-- Summary will go here -->
       </div>
-      <button id="closeModalBtn" class="close-btn">ตกลง</button>
+      <button type="button" id="closeModalBtn" class="close-btn">ตกลง</button>
+    </div>
+  </div>
+
+  <!-- PIN Modal -->
+  <div id="pinModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-icon">🔒</div>
+      <h2>ยืนยัน PIN Code</h2>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">กรุณากรอกรหัส PIN เพื่อบันทึกข้อมูล</p>
+      <input type="password" id="pinInput" class="pin-input" maxlength="6" placeholder="••••">
+      <button type="button" id="verifyPinBtn" class="close-btn">ตกลง</button>
     </div>
   </div>
 
@@ -224,14 +359,101 @@
     // ตั้งค่า URL ของ Google Apps Script
     // ==========================================
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXjfrF4Wh1U5mqxXPlf0r-gwu0edEbHENQSA06O-h4skR3oByW32A36kgnkplhY6eaqQ/exec';
+    const DEFAULT_PIN = '1234';
 
     // ==========================================
-    // ตั้งค่าวันปัจจุบัน
+    // ตั้งค่าวันและเดือนปัจจุบัน
     // ==========================================
-    document.getElementById('date').valueAsDate = new Date();
+    const today = new Date();
+    document.getElementById('date').valueAsDate = today;
+    document.getElementById('inst_date').valueAsDate = today;
+
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('inst_start').value = `${yyyy}-${mm}`;
 
     // ==========================================
-    // เปลี่ยนหมวดหมู่ตามประเภท
+    // Tab Navigation
+    // ==========================================
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (tabName === 'expense') {
+        document.getElementById('tab-expense-btn').classList.add('active');
+        document.getElementById('expense-tab-content').classList.add('active');
+      } else if (tabName === 'installment') {
+        document.getElementById('tab-installment-btn').classList.add('active');
+        document.getElementById('installment-tab-content').classList.add('active');
+        calculateInstallment();
+      }
+    }
+
+    // ==========================================
+    // คำนวณยอดผ่อนชำระ
+    // ==========================================
+    function calculateInstallment() {
+      const total = parseFloat(document.getElementById("inst_total").value) || 0;
+      const months = parseInt(document.getElementById("inst_months").value) || 0;
+      const interest = parseFloat(document.getElementById("inst_interest").value) || 0;
+      const startStr = document.getElementById("inst_start").value;
+      
+      if (months > 0 && total > 0) {
+        const totalWithInterest = total + (total * (interest / 100));
+        const monthly = totalWithInterest / months;
+        document.getElementById("inst_monthly").value = monthly.toFixed(2);
+        
+        if (startStr) {
+          const [y, m] = startStr.split("-");
+          let d = new Date(parseInt(y), parseInt(m) - 1 + months - 1, 1);
+          const ey = d.getFullYear();
+          const em = String(d.getMonth() + 1).padStart(2, '0');
+          document.getElementById("inst_end").value = `${ey}-${em}`;
+        }
+      } else {
+        document.getElementById("inst_monthly").value = "";
+        document.getElementById("inst_end").value = "";
+      }
+    }
+
+    // ==========================================
+    // ระบบ PIN Security
+    // ==========================================
+    let pendingSubmitCallback = null;
+
+    function checkPinAndExecute(callback) {
+      const savedPin = localStorage.getItem('capitalflow_pin') || DEFAULT_PIN;
+      const pinModal = document.getElementById('pinModal');
+      const pinInput = document.getElementById('pinInput');
+
+      pinInput.value = '';
+      pinModal.style.display = 'flex';
+      pinInput.focus();
+
+      pendingSubmitCallback = function() {
+        if (pinInput.value === savedPin) {
+          pinModal.style.display = 'none';
+          callback();
+        } else {
+          alert('❌ รหัส PIN ไม่ถูกต้อง!');
+          pinInput.value = '';
+          pinInput.focus();
+        }
+      };
+    }
+
+    document.getElementById('verifyPinBtn').onclick = function() {
+      if (pendingSubmitCallback) pendingSubmitCallback();
+    };
+
+    document.getElementById('pinInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        if (pendingSubmitCallback) pendingSubmitCallback();
+      }
+    });
+
+    // ==========================================
+    // Dynamic Categories (Expense Tab)
     // ==========================================
     const typeSelect = document.getElementById('type');
     const catSelect = document.getElementById('category');
@@ -277,69 +499,138 @@
       catSelect.dispatchEvent(new Event('change'));
     });
     
-    // Initialize category bindings
     catSelect.dispatchEvent(new Event('change'));
 
     // ==========================================
-    // ส่งข้อมูลฟอร์ม
+    // ส่งข้อมูลฟอร์ม Expense
     // ==========================================
     document.getElementById('expenseForm').addEventListener('submit', function(e) {
       e.preventDefault();
+      checkPinAndExecute(function() {
+        var btn = document.getElementById('submitBtn');
+        var status = document.getElementById('status');
 
-      var btn = document.getElementById('submitBtn');
-      var status = document.getElementById('status');
+        btn.textContent = 'กำลังบันทึก...';
+        btn.disabled = true;
+        status.style.display = 'none';
 
-      btn.textContent = 'กำลังบันทึก...';
-      btn.disabled = true;
-      status.style.display = 'none';
-
-      var data = {
-        date: document.getElementById('date').value,
-        type: document.getElementById('type').value,
-        category: document.getElementById('category').value,
-        frequency: document.getElementById('frequency').value,
-        item: document.getElementById('item').value,
-        amount: document.getElementById('amount').value
-      };
-
-      // ส่งข้อมูลไปยัง Google Apps Script ผ่าน fetch
-      fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(data)
-      })
-      .then(function(response) { return response.text(); })
-      .then(function(text) {
-        status.style.display = 'block';
-        btn.textContent = 'บันทึกเรียบร้อย';
-
-        // สร้างข้อความสรุป
-        var summaryHtml = 
-          '<b>วันที่:</b> ' + data.date + '<br>' +
-          '<b>ประเภท:</b> ' + data.type + '<br>' +
-          '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
-          '<b>รายการ:</b> ' + data.item + '<br>' +
-          '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
-        
-        document.getElementById('summaryDetails').innerHTML = summaryHtml;
-        var modal = document.getElementById('summaryModal');
-        modal.style.display = 'flex'; // แสดง Modal
-
-        // เมื่อกดปุ่ม "ตกลง" ให้ปิด Modal และรีเซ็ตฟอร์ม
-        document.getElementById('closeModalBtn').onclick = function() {
-          modal.style.display = 'none';
-          document.getElementById('expenseForm').reset();
-          document.getElementById('date').valueAsDate = new Date();
-          typeSelect.dispatchEvent(new Event('change'));
-          status.style.display = 'none';
-          btn.textContent = 'บันทึกข้อมูล';
-          btn.disabled = false;
+        var data = {
+          type: document.getElementById('type').value,
+          date: document.getElementById('date').value,
+          category: document.getElementById('category').value,
+          frequency: document.getElementById('frequency').value,
+          item: document.getElementById('item').value,
+          amount: document.getElementById('amount').value
         };
-      })
-      .catch(function(error) {
-        alert('เกิดข้อผิดพลาด: ' + error.message);
-        btn.textContent = 'บันทึกข้อมูล';
-        btn.disabled = false;
+
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data)
+        })
+        .then(res => res.text())
+        .then(text => {
+          status.style.display = 'block';
+          btn.textContent = 'บันทึกเรียบร้อย';
+
+          var summaryHtml = 
+            '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
+            '<b>วันที่:</b> ' + data.date + '<br>' +
+            '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
+            '<b>รายการ:</b> ' + data.item + '<br>' +
+            '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
+          
+          document.getElementById('summaryDetails').innerHTML = summaryHtml;
+          var modal = document.getElementById('summaryModal');
+          modal.style.display = 'flex';
+
+          document.getElementById('closeModalBtn').onclick = function() {
+            modal.style.display = 'none';
+            document.getElementById('expenseForm').reset();
+            document.getElementById('date').valueAsDate = new Date();
+            typeSelect.dispatchEvent(new Event('change'));
+            status.style.display = 'none';
+            btn.textContent = 'บันทึกรายจ่าย';
+            btn.disabled = false;
+          };
+        })
+        .catch(error => {
+          alert('เกิดข้อผิดพลาด: ' + error.message);
+          btn.textContent = 'บันทึกรายจ่าย';
+          btn.disabled = false;
+        });
+      });
+    });
+
+    // ==========================================
+    // ส่งข้อมูลฟอร์ม Installment
+    // ==========================================
+    document.getElementById('installmentForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      checkPinAndExecute(function() {
+        var btn = document.getElementById('instSubmitBtn');
+        var status = document.getElementById('instStatus');
+
+        btn.textContent = 'กำลังบันทึก...';
+        btn.disabled = true;
+        status.style.display = 'none';
+
+        var data = {
+          type: 'installment',
+          date: document.getElementById('inst_date').value,
+          item: document.getElementById('inst_item').value,
+          source: document.getElementById('inst_source').value,
+          total: document.getElementById('inst_total').value,
+          months: document.getElementById('inst_months').value,
+          interest: document.getElementById('inst_interest').value,
+          start_month: document.getElementById('inst_start').value,
+          end_month: document.getElementById('inst_end').value,
+          monthly_amount: document.getElementById('inst_monthly').value
+        };
+
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data)
+        })
+        .then(res => res.text())
+        .then(text => {
+          status.style.display = 'block';
+          btn.textContent = 'บันทึกเรียบร้อย';
+
+          var summaryHtml = 
+            '<b>ประเภท:</b> ผ่อนชำระ (Installment)<br>' +
+            '<b>วันที่:</b> ' + data.date + '<br>' +
+            '<b>รายการ:</b> ' + data.item + '<br>' +
+            '<b>บัตร/ผู้ให้บริการ:</b> ' + data.source + '<br>' +
+            '<b>ราคารวม:</b> ' + data.total + ' บาท (' + data.months + ' เดือน)<br>' +
+            '<b>เริ่ม-สิ้นสุด:</b> ' + data.start_month + ' ถึง ' + data.end_month + '<br>' +
+            '<b>ผ่อนเดือนละ:</b> <span style="color:#60a5fa;font-weight:600;">' + data.monthly_amount + ' บาท</span>';
+          
+          document.getElementById('summaryDetails').innerHTML = summaryHtml;
+          var modal = document.getElementById('summaryModal');
+          modal.style.display = 'flex';
+
+          document.getElementById('closeModalBtn').onclick = function() {
+            modal.style.display = 'none';
+            document.getElementById('installmentForm').reset();
+            document.getElementById('inst_date').valueAsDate = new Date();
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('inst_start').value = `${y}-${m}`;
+            document.getElementById('inst_interest').value = '0';
+            calculateInstallment();
+            status.style.display = 'none';
+            btn.textContent = 'บันทึกรายการผ่อน';
+            btn.disabled = false;
+          };
+        })
+        .catch(error => {
+          alert('เกิดข้อผิดพลาด: ' + error.message);
+          btn.textContent = 'บันทึกรายการผ่อน';
+          btn.disabled = false;
+        });
       });
     });
   </script>
