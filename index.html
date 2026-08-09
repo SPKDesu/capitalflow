@@ -417,40 +417,11 @@
     }
 
     // ==========================================
-    // ระบบ PIN Security
+    // PIN Verification (Disabled as per user request)
     // ==========================================
-    let pendingSubmitCallback = null;
-
     function checkPinAndExecute(callback) {
-      const savedPin = localStorage.getItem('capitalflow_pin') || DEFAULT_PIN;
-      const pinModal = document.getElementById('pinModal');
-      const pinInput = document.getElementById('pinInput');
-
-      pinInput.value = '';
-      pinModal.style.display = 'flex';
-      pinInput.focus();
-
-      pendingSubmitCallback = function() {
-        if (pinInput.value === savedPin) {
-          pinModal.style.display = 'none';
-          callback();
-        } else {
-          alert('❌ รหัส PIN ไม่ถูกต้อง!');
-          pinInput.value = '';
-          pinInput.focus();
-        }
-      };
+      callback();
     }
-
-    document.getElementById('verifyPinBtn').onclick = function() {
-      if (pendingSubmitCallback) pendingSubmitCallback();
-    };
-
-    document.getElementById('pinInput').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        if (pendingSubmitCallback) pendingSubmitCallback();
-      }
-    });
 
     // ==========================================
     // Dynamic Categories (Expense Tab)
