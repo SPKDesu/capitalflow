@@ -362,15 +362,60 @@
     const DEFAULT_PIN = '014948';
 
     // ==========================================
-    // ตั้งค่าวันและเดือนปัจจุบัน
+    // ฟังก์ชันจัดการวันและเดือนปัจจุบันตามเวลาเครื่อง (Local Timezone)
     // ==========================================
-    const today = new Date();
-    document.getElementById('date').valueAsDate = today;
-    document.getElementById('inst_date').valueAsDate = today;
+    function getLocalDateString() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
 
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    document.getElementById('inst_start').value = `${yyyy}-${mm}`;
+    function getLocalMonthString() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    }
+
+    let lastDefaultDate = '';
+    let lastDefaultMonth = '';
+
+    function updateDateDefaults(force = false) {
+      const currentLocalDate = getLocalDateString();
+      const currentLocalMonth = getLocalMonthString();
+
+      const dateInput = document.getElementById('date');
+      const instDateInput = document.getElementById('inst_date');
+      const instStartInput = document.getElementById('inst_start');
+
+      if (force || !dateInput.value || dateInput.value === lastDefaultDate) {
+        dateInput.value = currentLocalDate;
+      }
+      if (force || !instDateInput.value || instDateInput.value === lastDefaultDate) {
+        instDateInput.value = currentLocalDate;
+      }
+      if (force || !instStartInput.value || instStartInput.value === lastDefaultMonth) {
+        instStartInput.value = currentLocalMonth;
+      }
+
+      lastDefaultDate = currentLocalDate;
+      lastDefaultMonth = currentLocalMonth;
+    }
+
+    // กำหนดวันที่เริ่มต้น
+    updateDateDefaults(true);
+
+    // อัปเดตวันที่อัตโนมัติเมื่อสลับกลับมาที่แท็บ (แก้ปัญหาเปิดแท็บค้างข้ามคืน)
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        updateDateDefaults(false);
+      }
+    });
+    window.addEventListener('focus', function() {
+      updateDateDefaults(false);
+    });
 
     // ==========================================
     // Tab Navigation
@@ -518,7 +563,7 @@
           document.getElementById('closeModalBtn').onclick = function() {
             modal.style.display = 'none';
             document.getElementById('expenseForm').reset();
-            document.getElementById('date').valueAsDate = new Date();
+            updateDateDefaults(true);
             typeSelect.dispatchEvent(new Event('change'));
             status.style.display = 'none';
             btn.textContent = 'บันทึกรายจ่าย';
@@ -585,11 +630,7 @@
           document.getElementById('closeModalBtn').onclick = function() {
             modal.style.display = 'none';
             document.getElementById('installmentForm').reset();
-            document.getElementById('inst_date').valueAsDate = new Date();
-            const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            document.getElementById('inst_start').value = `${y}-${m}`;
+            updateDateDefaults(true);
             document.getElementById('inst_interest').value = '0';
             calculateInstallment();
             status.style.display = 'none';
