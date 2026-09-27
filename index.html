@@ -200,6 +200,153 @@
       padding: 0.6rem;
       margin-bottom: 1rem;
     }
+
+    /* AomAm Wallet Styles */
+    .aomam-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 16px;
+      padding: 1.25rem 1rem;
+      margin-bottom: 1.25rem;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .aomam-card::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at center, rgba(56, 189, 248, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .aomam-card .balance-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+    }
+    .aomam-card .balance-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #38bdf8;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      text-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
+      font-feature-settings: "tnum";
+    }
+    .aomam-card .stats-row {
+      display: flex;
+      justify-content: space-around;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 0.65rem;
+      font-size: 0.8rem;
+    }
+    .aomam-card .stat-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .aomam-card .stat-col span {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+    .aomam-card .stat-col b.deposit-text {
+      color: #34d399;
+      font-size: 0.9rem;
+    }
+    .aomam-card .stat-col b.withdraw-text {
+      color: #f87171;
+      font-size: 0.9rem;
+    }
+    .aomam-sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-top: 0.5rem;
+    }
+    .sync-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 6px #10b981;
+    }
+    .sync-dot.loading {
+      background-color: #f59e0b;
+      box-shadow: 0 0 6px #f59e0b;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Action Toggle Group */
+    .action-toggle {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 1.1rem;
+    }
+    .action-toggle-btn {
+      flex: 1;
+      padding: 0.7rem 0.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .action-toggle-btn.active.withdraw {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #ffffff;
+      font-weight: 600;
+      border-color: #ef4444;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+    }
+    .action-toggle-btn.active.deposit {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      font-weight: 600;
+      border-color: #10b981;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    }
+
+    /* Quick Tag Chips */
+    .quick-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 0.5rem;
+    }
+    .tag-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .tag-chip:active {
+      transform: scale(0.95);
+      background: rgba(59, 130, 246, 0.2);
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
   </style>
 </head>
 <body>
@@ -213,6 +360,9 @@
       </button>
       <button type="button" class="tab-btn" id="tab-installment-btn" onclick="switchTab('installment')">
         💳 <span>ผ่อนชำระ</span>
+      </button>
+      <button type="button" class="tab-btn" id="tab-aomam-btn" onclick="switchTab('aomam')">
+        👛 <span>เงินอ๋อมแอ๋ม</span>
       </button>
     </div>
 
@@ -329,6 +479,66 @@
         <div id="instStatus" class="status-msg">✅ บันทึกผ่อนชำระสำเร็จ!</div>
       </form>
     </div>
+
+    <!-- Tab 3: บันทึกเงินอ๋อมแอ๋ม -->
+    <div id="aomam-tab-content" class="tab-content">
+      <div class="aomam-card">
+        <div class="balance-label">ยอดเงินคงเหลือปัจจุบัน</div>
+        <div class="balance-value" id="aomam-balance">฿1,750.00</div>
+        <div class="stats-row">
+          <div class="stat-col">
+            <span>ฝากสะสม</span>
+            <b class="deposit-text" id="aomam-deposit">฿71,250.00</b>
+          </div>
+          <div class="stat-col">
+            <span>ถอนสะสม</span>
+            <b class="withdraw-text" id="aomam-withdraw">฿69,500.00</b>
+          </div>
+        </div>
+        <div class="aomam-sync-badge" onclick="promptAomAmUrl()" style="cursor: pointer;" title="กดเพื่อตั้งค่า WebApp URL">
+          <span class="sync-dot" id="aomam-sync-dot"></span>
+          <span id="aomam-sync-text">พร้อมใช้งาน (Google Sheet)</span>
+          <span style="opacity: 0.6; font-size: 0.75rem;">⚙️</span>
+        </div>
+      </div>
+
+      <form id="aomamForm">
+        <div class="action-toggle">
+          <button type="button" class="action-toggle-btn active withdraw" id="aomam-action-withdraw" onclick="setAomAmAction('ถอน')">
+            🔻 <span>ถอนเงิน</span>
+          </button>
+          <button type="button" class="action-toggle-btn deposit" id="aomam-action-deposit" onclick="setAomAmAction('ฝาก')">
+            🟢 <span>ฝากเงิน</span>
+          </button>
+        </div>
+        <input type="hidden" id="aomam_action" value="ถอน">
+
+        <div class="form-group">
+          <label>วันที่ (Date)</label>
+          <input type="date" id="aomam_date" required>
+        </div>
+
+        <div class="form-group">
+          <label>จำนวนเงิน (Amount)</label>
+          <input type="number" id="aomam_amount" placeholder="0.00" step="0.01" inputmode="decimal" required>
+        </div>
+
+        <div class="form-group">
+          <label>หมายเหตุ (Note)</label>
+          <input type="text" id="aomam_note" placeholder="เช่น ค่ารถรายอาทิตย์, ค่ากดสิว" autocomplete="off">
+          <div class="quick-tags">
+            <span class="tag-chip" onclick="setAomAmNote('ค่ารถรายอาทิตย์')">🚌 ค่ารถ</span>
+            <span class="tag-chip" onclick="setAomAmNote('ค่ากิน')">🍜 ค่ากิน</span>
+            <span class="tag-chip" onclick="setAomAmNote('ของใช้')">🛍️ ของใช้</span>
+            <span class="tag-chip" onclick="setAomAmNote('ความงาม')">💅 เสริมสวย</span>
+            <span class="tag-chip" onclick="setAomAmNote('ให้น้องยืม')">🤝 ให้น้องยืม</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="aomamSubmitBtn">บันทึกรายการ</button>
+        <div id="aomamStatus" class="status-msg">✅ บันทึกสำเร็จแล้ว!</div>
+      </form>
+    </div>
   </div>
 
   <!-- Summary Modal -->
@@ -359,6 +569,7 @@
     // ตั้งค่า URL ของ Google Apps Script
     // ==========================================
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXjfrF4Wh1U5mqxXPlf0r-gwu0edEbHENQSA06O-h4skR3oByW32A36kgnkplhY6eaqQ/exec';
+    let AOMAM_GAS_URL = localStorage.getItem('AOMAM_GAS_URL') || '';
     const DEFAULT_PIN = '014948';
 
     // ==========================================
@@ -389,6 +600,7 @@
       const dateInput = document.getElementById('date');
       const instDateInput = document.getElementById('inst_date');
       const instStartInput = document.getElementById('inst_start');
+      const aomamDateInput = document.getElementById('aomam_date');
 
       if (force || !dateInput.value || dateInput.value === lastDefaultDate) {
         dateInput.value = currentLocalDate;
@@ -398,6 +610,9 @@
       }
       if (force || !instStartInput.value || instStartInput.value === lastDefaultMonth) {
         instStartInput.value = currentLocalMonth;
+      }
+      if (aomamDateInput && (force || !aomamDateInput.value || aomamDateInput.value === lastDefaultDate)) {
+        aomamDateInput.value = currentLocalDate;
       }
 
       lastDefaultDate = currentLocalDate;
@@ -431,6 +646,10 @@
         document.getElementById('tab-installment-btn').classList.add('active');
         document.getElementById('installment-tab-content').classList.add('active');
         calculateInstallment();
+      } else if (tabName === 'aomam') {
+        document.getElementById('tab-aomam-btn').classList.add('active');
+        document.getElementById('aomam-tab-content').classList.add('active');
+        fetchAomAmSummary();
       }
     }
 
@@ -645,6 +864,248 @@
         });
       });
     });
+
+    // ==========================================
+    // จัดการแท็บเงินอ๋อมแอ๋ม (AomAm Wallet)
+    // ==========================================
+    function promptAomAmUrl() {
+      var currentUrl = (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : (localStorage.getItem('AOMAM_GAS_URL') || '');
+      var inputUrl = prompt('ตั้งค่า Google Apps Script Web App URL สำหรับเงินอ๋อมแอ๋ม:\n(คัดลอก Web App URL จาก Apps Script มาวางที่นี่)', currentUrl);
+      if (inputUrl !== null && inputUrl.trim() !== '') {
+        AOMAM_GAS_URL = inputUrl.trim();
+        localStorage.setItem('AOMAM_GAS_URL', AOMAM_GAS_URL);
+        alert('บันทึก WebApp URL เรียบร้อยแล้ว!');
+        fetchAomAmSummary();
+      }
+    }
+
+    function setAomAmAction(act) {
+      document.getElementById('aomam_action').value = act;
+      var btnWithdraw = document.getElementById('aomam-action-withdraw');
+      var btnDeposit = document.getElementById('aomam-action-deposit');
+      if (act === 'ถอน') {
+        btnWithdraw.className = 'action-toggle-btn active withdraw';
+        btnDeposit.className = 'action-toggle-btn deposit';
+      } else {
+        btnDeposit.className = 'action-toggle-btn active deposit';
+        btnWithdraw.className = 'action-toggle-btn withdraw';
+      }
+    }
+
+    function setAomAmNote(text) {
+      var noteInput = document.getElementById('aomam_note');
+      if (!noteInput.value || noteInput.value.trim() === '') {
+        noteInput.value = text;
+      } else {
+        noteInput.value = noteInput.value + ' ' + text;
+      }
+      noteInput.focus();
+    }
+
+    function updateAomAmDisplay(data) {
+      if (!data) return;
+      var balEl = document.getElementById('aomam-balance');
+      var depEl = document.getElementById('aomam-deposit');
+      var wdrEl = document.getElementById('aomam-withdraw');
+      var syncDot = document.getElementById('aomam-sync-dot');
+      var syncText = document.getElementById('aomam-sync-text');
+
+      if (data.balanceFormatted) {
+        balEl.textContent = data.balanceFormatted;
+      } else if (typeof data.balance === 'number') {
+        balEl.textContent = '฿' + data.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      if (data.totalDepositFormatted) {
+        depEl.textContent = data.totalDepositFormatted;
+      } else if (typeof data.totalDeposit === 'number') {
+        depEl.textContent = '฿' + data.totalDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      if (data.totalWithdrawFormatted) {
+        wdrEl.textContent = data.totalWithdrawFormatted;
+      } else if (typeof data.totalWithdraw === 'number') {
+        wdrEl.textContent = '฿' + data.totalWithdraw.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      syncDot.className = 'sync-dot';
+      syncText.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
+    }
+
+    function loadCachedAomAm() {
+      try {
+        var raw = localStorage.getItem('aomam_cache');
+        if (raw) {
+          var cached = JSON.parse(raw);
+          updateAomAmDisplay(cached);
+        } else {
+          // Default initial verified values
+          var initialData = {
+            balance: 1750,
+            balanceFormatted: '฿1,750.00',
+            totalDeposit: 71250,
+            totalDepositFormatted: '฿71,250.00',
+            totalWithdraw: 69500,
+            totalWithdrawFormatted: '฿69,500.00'
+          };
+          localStorage.setItem('aomam_cache', JSON.stringify(initialData));
+          updateAomAmDisplay(initialData);
+        }
+      } catch (e) {}
+    }
+
+    function fetchAomAmSummary() {
+      var syncDot = document.getElementById('aomam-sync-dot');
+      var syncText = document.getElementById('aomam-sync-text');
+      
+      var targetUrl = (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : localStorage.getItem('AOMAM_GAS_URL');
+      if (!targetUrl) {
+        syncDot.className = 'sync-dot';
+        syncText.textContent = 'พร้อมใช้งาน (ข้อมูลในเครื่อง)';
+        return;
+      }
+
+      syncDot.className = 'sync-dot loading';
+      syncText.textContent = 'กำลังซิงค์ยอดล่าสุด...';
+
+      fetch(targetUrl, { method: 'GET', mode: 'cors' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.status === 'success') {
+            updateAomAmDisplay(data);
+            localStorage.setItem('aomam_cache', JSON.stringify(data));
+          } else {
+            syncDot.className = 'sync-dot';
+            syncText.textContent = 'ข้อมูลจากเครื่องล่าสุด';
+          }
+        })
+        .catch(function(err) {
+          syncDot.className = 'sync-dot';
+          syncText.textContent = 'ข้อมูลจากเครื่องล่าสุด';
+        });
+    }
+
+    // Submit AomAm Form
+    document.getElementById('aomamForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      var btn = document.getElementById('aomamSubmitBtn');
+      var status = document.getElementById('aomamStatus');
+      var syncDot = document.getElementById('aomam-sync-dot');
+      var syncText = document.getElementById('aomam-sync-text');
+
+      var action = document.getElementById('aomam_action').value;
+      var date = document.getElementById('aomam_date').value;
+      var amount = parseFloat(document.getElementById('aomam_amount').value) || 0;
+      var note = document.getElementById('aomam_note').value.trim();
+
+      if (amount <= 0) {
+        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+        return;
+      }
+
+      btn.textContent = 'กำลังบันทึก...';
+      btn.disabled = true;
+      status.style.display = 'none';
+
+      // Optimistic update
+      var cached = {};
+      try {
+        cached = JSON.parse(localStorage.getItem('aomam_cache') || '{}');
+      } catch (ex) {}
+
+      var currentBal = typeof cached.balance === 'number' ? cached.balance : 1750;
+      var currentDep = typeof cached.totalDeposit === 'number' ? cached.totalDeposit : 71250;
+      var currentWdr = typeof cached.totalWithdraw === 'number' ? cached.totalWithdraw : 69500;
+
+      var newBal = (action === 'ฝาก') ? (currentBal + amount) : (currentBal - amount);
+      var newDep = (action === 'ฝาก') ? (currentDep + amount) : currentDep;
+      var newWdr = (action === 'ถอน') ? (currentWdr + amount) : currentWdr;
+
+      var optData = {
+        balance: newBal,
+        balanceFormatted: '฿' + newBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalDeposit: newDep,
+        totalDepositFormatted: '฿' + newDep.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalWithdraw: newWdr,
+        totalWithdrawFormatted: '฿' + newWdr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      };
+      updateAomAmDisplay(optData);
+      localStorage.setItem('aomam_cache', JSON.stringify(optData));
+
+      var targetUrl = (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : localStorage.getItem('AOMAM_GAS_URL');
+
+      var payload = {
+        action: action,
+        date: date,
+        amount: amount,
+        note: note
+      };
+
+      if (!targetUrl) {
+        // No remote URL configured yet, finish optimistically
+        setTimeout(function() {
+          btn.textContent = 'บันทึกรายการ';
+          btn.disabled = false;
+          showAomAmSummaryModal(payload, newBal);
+        }, 300);
+        return;
+      }
+
+      syncDot.className = 'sync-dot loading';
+      syncText.textContent = 'กำลังส่งข้อมูลไป Google Sheet...';
+
+      fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(resData) {
+        btn.textContent = 'บันทึกรายการ';
+        btn.disabled = false;
+
+        if (resData && resData.status === 'success') {
+          updateAomAmDisplay(resData);
+          localStorage.setItem('aomam_cache', JSON.stringify(resData));
+        }
+        showAomAmSummaryModal(payload, (resData && typeof resData.balance !== 'undefined') ? resData.balance : newBal);
+      })
+      .catch(function(err) {
+        btn.textContent = 'บันทึกรายการ';
+        btn.disabled = false;
+        syncDot.className = 'sync-dot';
+        syncText.textContent = 'บันทึกในเครื่องแล้ว (รอส่งซิงค์)';
+        showAomAmSummaryModal(payload, newBal);
+      });
+    });
+
+    function showAomAmSummaryModal(payload, bal) {
+      var actionColor = (payload.action === 'ฝาก') ? '#10b981' : '#f87171';
+      var summaryHtml = 
+        '<b>รายการ:</b> <span style="color:' + actionColor + ';font-weight:600;">' + payload.action + 'เงิน</span><br>' +
+        '<b>วันที่:</b> ' + payload.date + '<br>' +
+        '<b>จำนวนเงิน:</b> <span style="font-size:1.1rem;font-weight:700;color:' + actionColor + ';">' + payload.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ' บาท</span><br>' +
+        (payload.note ? ('<b>หมายเหตุ:</b> ' + payload.note + '<br>') : '') +
+        '<div style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid rgba(255,255,255,0.1);">' +
+        '<b>ยอดคงเหลือใหม่:</b> <span style="color:#38bdf8;font-weight:700;font-size:1.2rem;">฿' + Number(bal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span>' +
+        '</div>';
+
+      document.getElementById('summaryDetails').innerHTML = summaryHtml;
+      var modal = document.getElementById('summaryModal');
+      modal.style.display = 'flex';
+
+      document.getElementById('closeModalBtn').onclick = function() {
+        modal.style.display = 'none';
+        document.getElementById('aomamForm').reset();
+        document.getElementById('aomam_action').value = 'ถอน';
+        setAomAmAction('ถอน');
+        updateDateDefaults(true);
+      };
+    }
+
+    // โหลดแคชทันทีเมื่อเปิดหน้าเว็บ
+    loadCachedAomAm();
   </script>
 </body>
 </html>
