@@ -362,7 +362,7 @@
         💳 <span>ผ่อนชำระ</span>
       </button>
       <button type="button" class="tab-btn" id="tab-aomam-btn" onclick="switchTab('aomam')">
-        👛 <span>เงินอ๋อมแอ๋ม</span>
+        👛 <span>Aomaem</span>
       </button>
     </div>
 
@@ -480,21 +480,11 @@
       </form>
     </div>
 
-    <!-- Tab 3: บันทึกเงินอ๋อมแอ๋ม -->
+    <!-- Tab 3: บันทึกเงิน Aomaem -->
     <div id="aomam-tab-content" class="tab-content">
       <div class="aomam-card">
-        <div class="balance-label">ยอดเงินคงเหลือปัจจุบัน</div>
+        <div class="balance-label">ยอดเงินคงเหลือ Aomaem</div>
         <div class="balance-value" id="aomam-balance">฿1,750.00</div>
-        <div class="stats-row">
-          <div class="stat-col">
-            <span>ฝากสะสม</span>
-            <b class="deposit-text" id="aomam-deposit">฿71,250.00</b>
-          </div>
-          <div class="stat-col">
-            <span>ถอนสะสม</span>
-            <b class="withdraw-text" id="aomam-withdraw">฿69,500.00</b>
-          </div>
-        </div>
         <div class="aomam-sync-badge" onclick="promptAomAmUrl()" style="cursor: pointer;" title="กดเพื่อตั้งค่า WebApp URL">
           <span class="sync-dot" id="aomam-sync-dot"></span>
           <span id="aomam-sync-text">พร้อมใช้งาน (Google Sheet)</span>
@@ -569,7 +559,7 @@
     // ตั้งค่า URL ของ Google Apps Script
     // ==========================================
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwXjfrF4Wh1U5mqxXPlf0r-gwu0edEbHENQSA06O-h4skR3oByW32A36kgnkplhY6eaqQ/exec';
-    let AOMAM_GAS_URL = localStorage.getItem('AOMAM_GAS_URL') || '';
+    let AOMAM_GAS_URL = localStorage.getItem('AOMAM_GAS_URL') || 'https://script.google.com/macros/s/AKfycbz2godjSUq0N2o6iG0BXQEBN9OBqUGhC6N8UADn8h2MQsXiZV4eFIQ5scXwwOpxRiE/exec';
     const DEFAULT_PIN = '014948';
 
     // ==========================================
@@ -916,15 +906,15 @@
         balEl.textContent = '฿' + data.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
-      if (data.totalDepositFormatted) {
+      if (depEl && data.totalDepositFormatted) {
         depEl.textContent = data.totalDepositFormatted;
-      } else if (typeof data.totalDeposit === 'number') {
+      } else if (depEl && typeof data.totalDeposit === 'number') {
         depEl.textContent = '฿' + data.totalDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
-      if (data.totalWithdrawFormatted) {
+      if (wdrEl && data.totalWithdrawFormatted) {
         wdrEl.textContent = data.totalWithdrawFormatted;
-      } else if (typeof data.totalWithdraw === 'number') {
+      } else if (wdrEl && typeof data.totalWithdraw === 'number') {
         wdrEl.textContent = '฿' + data.totalWithdraw.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
