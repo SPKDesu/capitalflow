@@ -285,6 +285,24 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
     }
+    .sync-dot.warning {
+      background-color: #f59e0b;
+      box-shadow: 0 0 6px #f59e0b;
+    }
+    .global-sync-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: -0.6rem;
+      margin-bottom: 1.1rem;
+      cursor: pointer;
+      user-select: none;
+      transition: opacity 0.2s;
+    }
+    .global-sync-badge:active { opacity: 0.7; }
 
     /* Action Toggle Group */
     .action-toggle {
@@ -352,6 +370,10 @@
 <body>
   <div class="container">
     <h1>CapitalFlow</h1>
+    <div id="global-sync-badge" class="global-sync-badge" onclick="triggerManualSync()" title="กดเพื่อซิงค์ข้อมูลค้างส่ง">
+      <span class="sync-dot" id="global-sync-dot"></span>
+      <span id="global-sync-text">ซิงค์กับ Google Sheet เรียบร้อย</span>
+    </div>
     
     <!-- Tab Navigation -->
     <div class="tab-nav">
@@ -563,6 +585,118 @@
     const DEFAULT_PIN = '014948';
 
     // ==========================================
+    // Background Queue & Sync Management (Optimistic UI)
+    // ==========================================
+    const QUEUE_STORAGE_KEY = 'capitalflow_pending_queue';
+    let isSyncing = false;
+
+    function getPendingQueue() {
+      try {
+        const raw = localStorage.getItem(QUEUE_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function savePendingQueue(queue) {
+      try {
+        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      } catch (e) {
+        console.error('Failed to save pending queue:', e);
+      }
+      updateGlobalSyncBadge();
+    }
+
+    function updateGlobalSyncBadge() {
+      const dot = document.getElementById('global-sync-dot');
+      const text = document.getElementById('global-sync-text');
+      if (!dot || !text) return;
+
+      const queue = getPendingQueue();
+      const count = queue.length;
+
+      if (isSyncing) {
+        dot.className = 'sync-dot loading';
+        text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
+      } else if (count > 0) {
+        dot.className = 'sync-dot warning';
+        text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
+      } else {
+        dot.className = 'sync-dot';
+        text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
+      }
+    }
+
+    function prewarmGAS() {
+      try {
+        fetch(GAS_URL + '?action=test', { mode: 'no-cors' }).catch(() => {});
+      } catch (e) {}
+    }
+
+    async function processQueue() {
+      if (isSyncing) return;
+      const queue = getPendingQueue();
+      if (!queue.length) {
+        updateGlobalSyncBadge();
+        return;
+      }
+
+      isSyncing = true;
+      updateGlobalSyncBadge();
+
+      const item = queue[0];
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 28000);
+
+      try {
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(item.payload),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const currentQueue = getPendingQueue();
+          const remaining = currentQueue.filter(q => q.id !== item.id);
+          savePendingQueue(remaining);
+          isSyncing = false;
+          if (remaining.length > 0) {
+            setTimeout(processQueue, 300);
+          } else {
+            updateGlobalSyncBadge();
+          }
+        } else {
+          isSyncing = false;
+          updateGlobalSyncBadge();
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        isSyncing = false;
+        updateGlobalSyncBadge();
+      }
+    }
+
+    function enqueueTransaction(payload) {
+      const queue = getPendingQueue();
+      const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      queue.push({
+        id: txId,
+        payload: payload,
+        createdAt: new Date().toISOString()
+      });
+      savePendingQueue(queue);
+      processQueue();
+    }
+
+    function triggerManualSync() {
+      prewarmGAS();
+      processQueue();
+    }
+
+    // ==========================================
     // ฟังก์ชันจัดการวันและเดือนปัจจุบันตามเวลาเครื่อง (Local Timezone)
     // ==========================================
     function getLocalDateString() {
@@ -612,14 +746,21 @@
     // กำหนดวันที่เริ่มต้น
     updateDateDefaults(true);
 
-    // อัปเดตวันที่อัตโนมัติเมื่อสลับกลับมาที่แท็บ (แก้ปัญหาเปิดแท็บค้างข้ามคืน)
+    // อัปเดตวันที่อัตโนมัติและ Pre-warm Server เมื่อสลับกลับมาที่แท็บ (แก้ปัญหาเปิดแท็บค้างข้ามคืน)
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
         updateDateDefaults(false);
+        prewarmGAS();
+        processQueue();
       }
     });
     window.addEventListener('focus', function() {
       updateDateDefaults(false);
+      prewarmGAS();
+      processQueue();
+    });
+    window.addEventListener('online', function() {
+      processQueue();
     });
 
     // ==========================================
@@ -727,18 +868,11 @@
     catSelect.dispatchEvent(new Event('change'));
 
     // ==========================================
-    // ส่งข้อมูลฟอร์ม Expense
+    // ส่งข้อมูลฟอร์ม Expense (Optimistic UI + Background Sync)
     // ==========================================
     document.getElementById('expenseForm').addEventListener('submit', function(e) {
       e.preventDefault();
       checkPinAndExecute(function() {
-        var btn = document.getElementById('submitBtn');
-        var status = document.getElementById('status');
-
-        btn.textContent = 'กำลังบันทึก...';
-        btn.disabled = true;
-        status.style.display = 'none';
-
         var data = {
           type: document.getElementById('type').value,
           date: document.getElementById('date').value,
@@ -748,58 +882,36 @@
           amount: document.getElementById('amount').value
         };
 
-        fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(data)
-        })
-        .then(res => res.text())
-        .then(text => {
-          status.style.display = 'block';
-          btn.textContent = 'บันทึกเรียบร้อย';
+        // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
+        enqueueTransaction(data);
 
-          var summaryHtml = 
-            '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
-            '<b>วันที่:</b> ' + data.date + '<br>' +
-            '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
-            '<b>รายการ:</b> ' + data.item + '<br>' +
-            '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
-          
-          document.getElementById('summaryDetails').innerHTML = summaryHtml;
-          var modal = document.getElementById('summaryModal');
-          modal.style.display = 'flex';
+        // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
+        var summaryHtml = 
+          '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
+          '<b>วันที่:</b> ' + data.date + '<br>' +
+          '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
+          '<b>รายการ:</b> ' + data.item + '<br>' +
+          '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
+        
+        document.getElementById('summaryDetails').innerHTML = summaryHtml;
+        var modal = document.getElementById('summaryModal');
+        modal.style.display = 'flex';
 
-          document.getElementById('closeModalBtn').onclick = function() {
-            modal.style.display = 'none';
-            document.getElementById('expenseForm').reset();
-            updateDateDefaults(true);
-            typeSelect.dispatchEvent(new Event('change'));
-            status.style.display = 'none';
-            btn.textContent = 'บันทึกรายจ่าย';
-            btn.disabled = false;
-          };
-        })
-        .catch(error => {
-          alert('เกิดข้อผิดพลาด: ' + error.message);
-          btn.textContent = 'บันทึกรายจ่าย';
-          btn.disabled = false;
-        });
+        document.getElementById('closeModalBtn').onclick = function() {
+          modal.style.display = 'none';
+          document.getElementById('expenseForm').reset();
+          updateDateDefaults(true);
+          typeSelect.dispatchEvent(new Event('change'));
+        };
       });
     });
 
     // ==========================================
-    // ส่งข้อมูลฟอร์ม Installment
+    // ส่งข้อมูลฟอร์ม Installment (Optimistic UI + Background Sync)
     // ==========================================
     document.getElementById('installmentForm').addEventListener('submit', function(e) {
       e.preventDefault();
       checkPinAndExecute(function() {
-        var btn = document.getElementById('instSubmitBtn');
-        var status = document.getElementById('instStatus');
-
-        btn.textContent = 'กำลังบันทึก...';
-        btn.disabled = true;
-        status.style.display = 'none';
-
         var data = {
           type: 'installment',
           date: document.getElementById('inst_date').value,
@@ -813,45 +925,30 @@
           monthly_amount: document.getElementById('inst_monthly').value
         };
 
-        fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(data)
-        })
-        .then(res => res.text())
-        .then(text => {
-          status.style.display = 'block';
-          btn.textContent = 'บันทึกเรียบร้อย';
+        // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
+        enqueueTransaction(data);
 
-          var summaryHtml = 
-            '<b>ประเภท:</b> ผ่อนชำระ (Installment)<br>' +
-            '<b>วันที่:</b> ' + data.date + '<br>' +
-            '<b>รายการ:</b> ' + data.item + '<br>' +
-            '<b>บัตร/ผู้ให้บริการ:</b> ' + data.source + '<br>' +
-            '<b>ราคารวม:</b> ' + data.total + ' บาท (' + data.months + ' เดือน)<br>' +
-            '<b>เริ่ม-สิ้นสุด:</b> ' + data.start_month + ' ถึง ' + data.end_month + '<br>' +
-            '<b>ผ่อนเดือนละ:</b> <span style="color:#60a5fa;font-weight:600;">' + data.monthly_amount + ' บาท</span>';
-          
-          document.getElementById('summaryDetails').innerHTML = summaryHtml;
-          var modal = document.getElementById('summaryModal');
-          modal.style.display = 'flex';
+        // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
+        var summaryHtml = 
+          '<b>ประเภท:</b> ผ่อนชำระ (Installment)<br>' +
+          '<b>วันที่:</b> ' + data.date + '<br>' +
+          '<b>รายการ:</b> ' + data.item + '<br>' +
+          '<b>บัตร/ผู้ให้บริการ:</b> ' + data.source + '<br>' +
+          '<b>ราคารวม:</b> ' + data.total + ' บาท (' + data.months + ' เดือน)<br>' +
+          '<b>เริ่ม-สิ้นสุด:</b> ' + data.start_month + ' ถึง ' + data.end_month + '<br>' +
+          '<b>ผ่อนเดือนละ:</b> <span style="color:#60a5fa;font-weight:600;">' + data.monthly_amount + ' บาท</span>';
+        
+        document.getElementById('summaryDetails').innerHTML = summaryHtml;
+        var modal = document.getElementById('summaryModal');
+        modal.style.display = 'flex';
 
-          document.getElementById('closeModalBtn').onclick = function() {
-            modal.style.display = 'none';
-            document.getElementById('installmentForm').reset();
-            updateDateDefaults(true);
-            document.getElementById('inst_interest').value = '0';
-            calculateInstallment();
-            status.style.display = 'none';
-            btn.textContent = 'บันทึกรายการผ่อน';
-            btn.disabled = false;
-          };
-        })
-        .catch(error => {
-          alert('เกิดข้อผิดพลาด: ' + error.message);
-          btn.textContent = 'บันทึกรายการผ่อน';
-          btn.disabled = false;
-        });
+        document.getElementById('closeModalBtn').onclick = function() {
+          modal.style.display = 'none';
+          document.getElementById('installmentForm').reset();
+          updateDateDefaults(true);
+          document.getElementById('inst_interest').value = '0';
+          calculateInstallment();
+        };
       });
     });
 
@@ -1094,7 +1191,10 @@
       };
     }
 
-    // โหลดแคชทันทีเมื่อเปิดหน้าเว็บ
+    // เริ่มต้น Pre-warm, ตรวจสอบคิว และโหลดแคชทันทีเมื่อเปิดหน้าเว็บ
+    prewarmGAS();
+    updateGlobalSyncBadge();
+    processQueue();
     loadCachedAomAm();
   </script>
 </body>
