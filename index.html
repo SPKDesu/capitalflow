@@ -430,6 +430,27 @@
             <option value="รายจ่ายอื่น ๆ">รายจ่ายอื่น ๆ</option>
           </select>
         </div>
+
+        <!-- ข้อมูลเติมน้ำมันมอเตอร์ไซค์ (แสดงเฉพาะเมื่อหมวดหมู่เป็น 'น้ำมัน') -->
+        <div id="moto-fuel-inputs" style="display: none; background: rgba(15, 118, 110, 0.15); border: 1px solid rgba(20, 184, 166, 0.3); border-radius: 14px; padding: 0.85rem 1rem; margin-bottom: 1.1rem;">
+          <div style="font-size: 0.82rem; color: #a7f3d0; font-weight: 600; margin-bottom: 0.6rem; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏍️ ข้อมูลเติมน้ำมัน NMAX</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">ล่าสุด: <b id="moto-last-odo-badge" style="color: #34d399;">45,318</b> กม.</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 0.8rem;">เลขไมล์ (Odometer)</label>
+              <input type="number" id="moto_odo" placeholder="เช่น 45500" step="1">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label style="font-size: 0.8rem;">ราคา/ลิตร (THB)</label>
+              <input type="number" id="moto_ppl" placeholder="39.99" step="0.01">
+            </div>
+          </div>
+          <div id="moto-odo-error" style="display: none; color: #fb7185; font-size: 0.78rem; font-weight: 500; margin-top: 0.5rem;">
+            ⚠️ เลขไมล์ต้องมากกว่าครั้งก่อนหน้า (<span id="moto-odo-error-val">45,318</span> กม.)
+          </div>
+        </div>
         
         <div class="form-group">
           <label>รายการ (Item Name)</label>
@@ -831,6 +852,52 @@
       'ลงทุน': ['เงินลงทุน']
     };
 
+    // ==========================================
+    // Motorcycle Fuel Storage & Validation Helpers
+    // ==========================================
+    const DEFAULT_LAST_FUEL_ODO = 45318;
+    const DEFAULT_LAST_FUEL_PPL = 39.99;
+
+    function getLastFuelOdo() {
+      const val = localStorage.getItem('capitalflow_last_fuel_odo');
+      return val ? parseInt(val, 10) : DEFAULT_LAST_FUEL_ODO;
+    }
+
+    function getLastFuelPpl() {
+      const val = localStorage.getItem('capitalflow_last_fuel_ppl');
+      return val ? parseFloat(val) : DEFAULT_LAST_FUEL_PPL;
+    }
+
+    function validateMotoOdometer() {
+      const cat = document.getElementById('category').value;
+      if (cat !== 'น้ำมัน') {
+        document.getElementById('submitBtn').disabled = false;
+        return true;
+      }
+      const odoInput = document.getElementById('moto_odo');
+      const submitBtn = document.getElementById('submitBtn');
+      const errorEl = document.getElementById('moto-odo-error');
+      const lastOdo = getLastFuelOdo();
+      
+      const val = parseInt(odoInput.value, 10);
+      if (!val || isNaN(val)) {
+        errorEl.style.display = 'none';
+        submitBtn.disabled = true;
+        return false;
+      }
+      if (val <= lastOdo) {
+        errorEl.style.display = 'block';
+        submitBtn.disabled = true;
+        return false;
+      } else {
+        errorEl.style.display = 'none';
+        submitBtn.disabled = false;
+        return true;
+      }
+    }
+
+    document.getElementById('moto_odo').addEventListener('input', validateMotoOdometer);
+
     catSelect.addEventListener('change', function(e) {
       var cat = e.target.value;
       var itemInput = document.getElementById('item');
@@ -850,6 +917,40 @@
         freqSelect.value = 'คงที่';
       } else {
         freqSelect.value = 'ทั่วไป';
+      }
+
+      // Motorcycle Fuel Form Toggle
+      const isFuel = (cat === 'น้ำมัน');
+      const motoBox = document.getElementById('moto-fuel-inputs');
+      const motoOdoInput = document.getElementById('moto_odo');
+      const motoPplInput = document.getElementById('moto_ppl');
+      const badge = document.getElementById('moto-last-odo-badge');
+      const errorVal = document.getElementById('moto-odo-error-val');
+
+      if (isFuel) {
+        motoBox.style.display = 'block';
+        const lastOdo = getLastFuelOdo();
+        const lastPpl = getLastFuelPpl();
+        if (badge) badge.textContent = lastOdo.toLocaleString();
+        if (errorVal) errorVal.textContent = lastOdo.toLocaleString();
+        if (motoPplInput && !motoPplInput.value) {
+          motoPplInput.value = lastPpl;
+        }
+        motoOdoInput.required = true;
+        motoPplInput.required = true;
+        validateMotoOdometer();
+      } else {
+        motoBox.style.display = 'none';
+        if (motoOdoInput) {
+          motoOdoInput.required = false;
+          motoOdoInput.value = '';
+        }
+        if (motoPplInput) {
+          motoPplInput.required = false;
+        }
+        const errorEl = document.getElementById('moto-odo-error');
+        if (errorEl) errorEl.style.display = 'none';
+        document.getElementById('submitBtn').disabled = false;
       }
     });
 
@@ -882,6 +983,27 @@
           amount: document.getElementById('amount').value
         };
 
+        if (data.category === 'น้ำมัน') {
+          const odoInput = document.getElementById('moto_odo');
+          const pplInput = document.getElementById('moto_ppl');
+          const odo = parseInt(odoInput.value, 10);
+          const ppl = parseFloat(pplInput.value) || getLastFuelPpl();
+          
+          if (!odo || odo <= getLastFuelOdo()) {
+            alert('กรุณากรอกเลขไมล์ให้ถูกต้อง (ต้องมากกว่า ' + getLastFuelOdo().toLocaleString() + ' กม.)');
+            return;
+          }
+
+          localStorage.setItem('capitalflow_last_fuel_odo', odo);
+          localStorage.setItem('capitalflow_last_fuel_ppl', ppl);
+
+          data.odometer = odo;
+          data.price_per_liter = ppl;
+          data.vehicle = 'NMAX';
+          // Dual Delivery: Embed metadata in item for 100% GAS pass-through
+          data.item = `น้ำมัน [ODO:${odo},PPL:${ppl}]`;
+        }
+
         // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
         enqueueTransaction(data);
 
@@ -890,7 +1012,8 @@
           '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
           '<b>วันที่:</b> ' + data.date + '<br>' +
           '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
-          '<b>รายการ:</b> ' + data.item + '<br>' +
+          '<b>รายการ:</b> ' + (data.category === 'น้ำมัน' ? 'น้ำมัน NMAX' : data.item) + '<br>' +
+          (data.category === 'น้ำมัน' && data.odometer ? ('<b>เลขไมล์:</b> ' + Number(data.odometer).toLocaleString() + ' กม. (ราคา ' + data.price_per_liter + ' บ./ลิตร)<br>') : '') +
           '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
         
         document.getElementById('summaryDetails').innerHTML = summaryHtml;
@@ -902,6 +1025,11 @@
           document.getElementById('expenseForm').reset();
           updateDateDefaults(true);
           typeSelect.dispatchEvent(new Event('change'));
+          const motoBox = document.getElementById('moto-fuel-inputs');
+          if (motoBox) motoBox.style.display = 'none';
+          const errorEl = document.getElementById('moto-odo-error');
+          if (errorEl) errorEl.style.display = 'none';
+          document.getElementById('submitBtn').disabled = false;
         };
       });
     });
