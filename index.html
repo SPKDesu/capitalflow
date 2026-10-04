@@ -541,10 +541,10 @@
       <div class="aomam-card">
         <div class="balance-label">ยอดเงินคงเหลืออ๋อมแอ๋ม</div>
         <div class="balance-value" id="aomam-balance">฿1,750.00</div>
-        <div class="aomam-sync-badge" onclick="promptAomAmUrl()" style="cursor: pointer;" title="กดเพื่อตั้งค่า WebApp URL">
+        <div class="aomam-sync-badge" onclick="triggerManualSync()" style="cursor: pointer;" title="แตะเพื่อซิงค์ข้อมูล">
           <span class="sync-dot" id="aomam-sync-dot"></span>
           <span id="aomam-sync-text">พร้อมใช้งาน (Google Sheet)</span>
-          <span style="opacity: 0.6; font-size: 0.75rem;">⚙️</span>
+          <span style="opacity: 0.6; font-size: 0.75rem; padding-left: 4px;" onclick="promptAomAmUrl(); event.stopPropagation();" title="กดเพื่อตั้งค่า WebApp URL">⚙️</span>
         </div>
       </div>
 
@@ -618,6 +618,10 @@
     let AOMAM_GAS_URL = localStorage.getItem('AOMAM_GAS_URL') || 'https://script.google.com/macros/s/AKfycbz2godjSUq0N2o6iG0BXQEBN9OBqUGhC6N8UADn8h2MQsXiZV4eFIQ5scXwwOpxRiE/exec';
     const DEFAULT_PIN = '014948';
 
+    function getAomAmGasUrl() {
+      return (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : (localStorage.getItem('AOMAM_GAS_URL') || 'https://script.google.com/macros/s/AKfycbz2godjSUq0N2o6iG0BXQEBN9OBqUGhC6N8UADn8h2MQsXiZV4eFIQ5scXwwOpxRiE/exec');
+    }
+
     // ==========================================
     // Background Queue & Sync Management (Optimistic UI)
     // ==========================================
@@ -645,26 +649,47 @@
     function updateGlobalSyncBadge() {
       const dot = document.getElementById('global-sync-dot');
       const text = document.getElementById('global-sync-text');
-      if (!dot || !text) return;
+      const aomamDot = document.getElementById('aomam-sync-dot');
+      const aomamText = document.getElementById('aomam-sync-text');
 
       const queue = getPendingQueue();
       const count = queue.length;
+      const aomamCount = queue.filter(q => q.type === 'aomam').length;
 
-      if (isSyncing) {
-        dot.className = 'sync-dot loading';
-        text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
-      } else if (count > 0) {
-        dot.className = 'sync-dot warning';
-        text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
-      } else {
-        dot.className = 'sync-dot';
-        text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
+      if (dot && text) {
+        if (isSyncing) {
+          dot.className = 'sync-dot loading';
+          text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
+        } else if (count > 0) {
+          dot.className = 'sync-dot warning';
+          text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
+        } else {
+          dot.className = 'sync-dot';
+          text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
+        }
+      }
+
+      if (aomamDot && aomamText) {
+        if (isSyncing && aomamCount > 0) {
+          aomamDot.className = 'sync-dot loading';
+          aomamText.textContent = `กำลังซิงค์... (เหลือ ${aomamCount} รายการ)`;
+        } else if (aomamCount > 0) {
+          aomamDot.className = 'sync-dot warning';
+          aomamText.textContent = `รอซิงค์ (${aomamCount} รายการ) • แตะเพื่อส่ง`;
+        } else {
+          aomamDot.className = 'sync-dot';
+          aomamText.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
+        }
       }
     }
 
     function prewarmGAS() {
       try {
         fetch(GAS_URL + '?action=test', { mode: 'no-cors' }).catch(() => {});
+        const aomamUrl = getAomAmGasUrl();
+        if (aomamUrl) {
+          fetch(aomamUrl + '?action=test', { mode: 'no-cors' }).catch(() => {});
+        }
       } catch (e) {}
     }
 
@@ -680,11 +705,12 @@
       updateGlobalSyncBadge();
 
       const item = queue[0];
+      const targetUrl = item.targetUrl || (item.type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 28000);
 
       try {
-        const res = await fetch(GAS_URL, {
+        const res = await fetch(targetUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify(item.payload),
@@ -693,6 +719,17 @@
         clearTimeout(timeoutId);
 
         if (res.ok) {
+          // If aomam, update display with server response if valid JSON returned
+          if (item.type === 'aomam') {
+            try {
+              const resData = await res.json();
+              if (resData && resData.status === 'success') {
+                updateAomAmDisplay(resData);
+                localStorage.setItem('aomam_cache', JSON.stringify(resData));
+              }
+            } catch (jsonErr) {}
+          }
+
           const currentQueue = getPendingQueue();
           const remaining = currentQueue.filter(q => q.id !== item.id);
           savePendingQueue(remaining);
@@ -713,11 +750,14 @@
       }
     }
 
-    function enqueueTransaction(payload) {
+    function enqueueTransaction(payload, targetUrl, type = 'expense') {
       const queue = getPendingQueue();
       const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      const url = targetUrl || (type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
       queue.push({
         id: txId,
+        type: type,
+        targetUrl: url,
         payload: payload,
         createdAt: new Date().toISOString()
       });
@@ -728,6 +768,10 @@
     function triggerManualSync() {
       prewarmGAS();
       processQueue();
+      const aomamTab = document.getElementById('aomam-tab-content');
+      if (aomamTab && aomamTab.classList.contains('active')) {
+        fetchAomAmSummary();
+      }
     }
 
     // ==========================================
@@ -1018,7 +1062,7 @@
         }
 
         // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        enqueueTransaction(data);
+        enqueueTransaction(data, GAS_URL, 'expense');
 
         // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
         var summaryHtml = 
@@ -1067,7 +1111,7 @@
         };
 
         // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        enqueueTransaction(data);
+        enqueueTransaction(data, GAS_URL, 'installment');
 
         // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
         var summaryHtml = 
@@ -1213,14 +1257,9 @@
         });
     }
 
-    // Submit AomAm Form
+    // Submit AomAm Form (Optimistic UI + Background Sync)
     document.getElementById('aomamForm').addEventListener('submit', function(e) {
       e.preventDefault();
-
-      var btn = document.getElementById('aomamSubmitBtn');
-      var status = document.getElementById('aomamStatus');
-      var syncDot = document.getElementById('aomam-sync-dot');
-      var syncText = document.getElementById('aomam-sync-text');
 
       var action = document.getElementById('aomam_action').value;
       var date = document.getElementById('aomam_date').value;
@@ -1232,11 +1271,7 @@
         return;
       }
 
-      btn.textContent = 'กำลังบันทึก...';
-      btn.disabled = true;
-      status.style.display = 'none';
-
-      // Optimistic update
+      // Optimistic balance calculation
       var cached = {};
       try {
         cached = JSON.parse(localStorage.getItem('aomam_cache') || '{}');
@@ -1261,8 +1296,6 @@
       updateAomAmDisplay(optData);
       localStorage.setItem('aomam_cache', JSON.stringify(optData));
 
-      var targetUrl = (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : localStorage.getItem('AOMAM_GAS_URL');
-
       var payload = {
         action: action,
         date: date,
@@ -1270,42 +1303,11 @@
         note: note
       };
 
-      if (!targetUrl) {
-        // No remote URL configured yet, finish optimistically
-        setTimeout(function() {
-          btn.textContent = 'บันทึกรายการ';
-          btn.disabled = false;
-          showAomAmSummaryModal(payload, newBal);
-        }, 300);
-        return;
-      }
+      // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที (Silent Background Sync)
+      enqueueTransaction(payload, getAomAmGasUrl(), 'aomam');
 
-      syncDot.className = 'sync-dot loading';
-      syncText.textContent = 'กำลังส่งข้อมูลไป Google Sheet...';
-
-      fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(resData) {
-        btn.textContent = 'บันทึกรายการ';
-        btn.disabled = false;
-
-        if (resData && resData.status === 'success') {
-          updateAomAmDisplay(resData);
-          localStorage.setItem('aomam_cache', JSON.stringify(resData));
-        }
-        showAomAmSummaryModal(payload, (resData && typeof resData.balance !== 'undefined') ? resData.balance : newBal);
-      })
-      .catch(function(err) {
-        btn.textContent = 'บันทึกรายการ';
-        btn.disabled = false;
-        syncDot.className = 'sync-dot';
-        syncText.textContent = 'บันทึกในเครื่องแล้ว (รอส่งซิงค์)';
-        showAomAmSummaryModal(payload, newBal);
-      });
+      // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response < 10ms)
+      showAomAmSummaryModal(payload, newBal);
     });
 
     function showAomAmSummaryModal(payload, bal) {
