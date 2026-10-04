@@ -44,6 +44,12 @@
         padding: 1.15rem 1rem;
         border-radius: 16px;
       }
+      .tab-btn {
+        padding: 0.6rem 0.25rem;
+        font-size: 0.85rem;
+        gap: 4px;
+        white-space: nowrap;
+      }
     }
     h1 {
       font-size: 1.5rem;
@@ -242,7 +248,7 @@
       font-weight: 700;
       color: #38bdf8;
       line-height: 1.2;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0;
       text-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
       font-feature-settings: "tnum";
     }
@@ -541,11 +547,6 @@
       <div class="aomam-card">
         <div class="balance-label">ยอดเงินคงเหลืออ๋อมแอ๋ม</div>
         <div class="balance-value" id="aomam-balance">฿1,750.00</div>
-        <div class="aomam-sync-badge" onclick="triggerManualSync()" style="cursor: pointer;" title="แตะเพื่อซิงค์ข้อมูล">
-          <span class="sync-dot" id="aomam-sync-dot"></span>
-          <span id="aomam-sync-text">พร้อมใช้งาน (Google Sheet)</span>
-          <span style="opacity: 0.6; font-size: 0.75rem; padding-left: 4px;" onclick="promptAomAmUrl(); event.stopPropagation();" title="กดเพื่อตั้งค่า WebApp URL">⚙️</span>
-        </div>
       </div>
 
       <form id="aomamForm">
@@ -649,37 +650,20 @@
     function updateGlobalSyncBadge() {
       const dot = document.getElementById('global-sync-dot');
       const text = document.getElementById('global-sync-text');
-      const aomamDot = document.getElementById('aomam-sync-dot');
-      const aomamText = document.getElementById('aomam-sync-text');
+      if (!dot || !text) return;
 
       const queue = getPendingQueue();
       const count = queue.length;
-      const aomamCount = queue.filter(q => q.type === 'aomam').length;
 
-      if (dot && text) {
-        if (isSyncing) {
-          dot.className = 'sync-dot loading';
-          text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
-        } else if (count > 0) {
-          dot.className = 'sync-dot warning';
-          text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
-        } else {
-          dot.className = 'sync-dot';
-          text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
-        }
-      }
-
-      if (aomamDot && aomamText) {
-        if (isSyncing && aomamCount > 0) {
-          aomamDot.className = 'sync-dot loading';
-          aomamText.textContent = `กำลังซิงค์... (เหลือ ${aomamCount} รายการ)`;
-        } else if (aomamCount > 0) {
-          aomamDot.className = 'sync-dot warning';
-          aomamText.textContent = `รอซิงค์ (${aomamCount} รายการ) • แตะเพื่อส่ง`;
-        } else {
-          aomamDot.className = 'sync-dot';
-          aomamText.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
-        }
+      if (isSyncing) {
+        dot.className = 'sync-dot loading';
+        text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
+      } else if (count > 0) {
+        dot.className = 'sync-dot warning';
+        text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
+      } else {
+        dot.className = 'sync-dot';
+        text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
       }
     }
 
@@ -1179,13 +1163,13 @@
       var balEl = document.getElementById('aomam-balance');
       var depEl = document.getElementById('aomam-deposit');
       var wdrEl = document.getElementById('aomam-withdraw');
-      var syncDot = document.getElementById('aomam-sync-dot');
-      var syncText = document.getElementById('aomam-sync-text');
 
-      if (data.balanceFormatted) {
-        balEl.textContent = data.balanceFormatted;
-      } else if (typeof data.balance === 'number') {
-        balEl.textContent = '฿' + data.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (balEl) {
+        if (data.balanceFormatted) {
+          balEl.textContent = data.balanceFormatted;
+        } else if (typeof data.balance === 'number') {
+          balEl.textContent = '฿' + data.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
       }
 
       if (depEl && data.totalDepositFormatted) {
@@ -1199,9 +1183,6 @@
       } else if (wdrEl && typeof data.totalWithdraw === 'number') {
         wdrEl.textContent = '฿' + data.totalWithdraw.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
-
-      syncDot.className = 'sync-dot';
-      syncText.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
     }
 
     function loadCachedAomAm() {
@@ -1227,18 +1208,8 @@
     }
 
     function fetchAomAmSummary() {
-      var syncDot = document.getElementById('aomam-sync-dot');
-      var syncText = document.getElementById('aomam-sync-text');
-      
-      var targetUrl = (typeof AOMAM_GAS_URL !== 'undefined' && AOMAM_GAS_URL) ? AOMAM_GAS_URL : localStorage.getItem('AOMAM_GAS_URL');
-      if (!targetUrl) {
-        syncDot.className = 'sync-dot';
-        syncText.textContent = 'พร้อมใช้งาน (ข้อมูลในเครื่อง)';
-        return;
-      }
-
-      syncDot.className = 'sync-dot loading';
-      syncText.textContent = 'กำลังซิงค์ยอดล่าสุด...';
+      var targetUrl = getAomAmGasUrl();
+      if (!targetUrl) return;
 
       fetch(targetUrl, { method: 'GET', mode: 'cors' })
         .then(function(res) { return res.json(); })
@@ -1246,15 +1217,9 @@
           if (data && data.status === 'success') {
             updateAomAmDisplay(data);
             localStorage.setItem('aomam_cache', JSON.stringify(data));
-          } else {
-            syncDot.className = 'sync-dot';
-            syncText.textContent = 'ข้อมูลจากเครื่องล่าสุด';
           }
         })
-        .catch(function(err) {
-          syncDot.className = 'sync-dot';
-          syncText.textContent = 'ข้อมูลจากเครื่องล่าสุด';
-        });
+        .catch(function(err) {});
     }
 
     // Submit AomAm Form (Optimistic UI + Background Sync)
