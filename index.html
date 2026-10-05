@@ -628,7 +628,14 @@
     // ==========================================
     // Background Queue & Sync Management (Optimistic UI)
     // ==========================================
+    // Background Queue & Sync Management (Optimistic UI + Deduplication Guard)
+    // ==========================================
     const QUEUE_STORAGE_KEY = 'capitalflow_pending_queue';
+    const SYNC_LOCK_KEY = 'capitalflow_sync_lock';
+    const RECENT_SIGS_KEY = 'capitalflow_recent_sigs';
+    const LOCK_EXPIRY_MS = 32000;
+    const RETRY_BACKOFF_MS = 15000;
+    const DEDUP_WINDOW_MS = 15000;
     let isSyncing = false;
 
     function getPendingQueue() {
@@ -647,6 +654,58 @@
         console.error('Failed to save pending queue:', e);
       }
       updateGlobalSyncBadge();
+    }
+
+    function acquireSyncLock() {
+      if (isSyncing) return false;
+      const now = Date.now();
+      const lockVal = parseInt(localStorage.getItem(SYNC_LOCK_KEY) || '0', 10);
+      if (now - lockVal < LOCK_EXPIRY_MS) {
+        return false; // locked by ongoing sync
+      }
+      localStorage.setItem(SYNC_LOCK_KEY, String(now));
+      isSyncing = true;
+      return true;
+    }
+
+    function releaseSyncLock() {
+      isSyncing = false;
+      localStorage.removeItem(SYNC_LOCK_KEY);
+    }
+
+    function getPayloadSignature(payload, type) {
+      if (!payload) return '';
+      if (type === 'expense') {
+        return ['expense', payload.date || '', payload.category || '', payload.item || '', payload.amount || ''].join('::');
+      } else if (type === 'installment') {
+        return ['installment', payload.date || '', payload.item || '', payload.source || '', payload.total || '', payload.months || ''].join('::');
+      } else if (type === 'aomam') {
+        return ['aomam', payload.date || '', payload.action || '', payload.amount || '', payload.note || ''].join('::');
+      }
+      return JSON.stringify(payload);
+    }
+
+    function isDuplicateSubmission(sig) {
+      const now = Date.now();
+      let recents = [];
+      try {
+        recents = JSON.parse(sessionStorage.getItem(RECENT_SIGS_KEY) || '[]');
+      } catch (e) { recents = []; }
+
+      // Clean expired signatures
+      recents = recents.filter(r => (now - r.t) < DEDUP_WINDOW_MS);
+
+      const found = recents.some(r => r.s === sig);
+      if (found) {
+        sessionStorage.setItem(RECENT_SIGS_KEY, JSON.stringify(recents));
+        return true;
+      }
+
+      recents.push({ s: sig, t: now });
+      try {
+        sessionStorage.setItem(RECENT_SIGS_KEY, JSON.stringify(recents));
+      } catch (e) {}
+      return false;
     }
 
     function updateGlobalSyncBadge() {
@@ -680,17 +739,30 @@
     }
 
     async function processQueue() {
-      if (isSyncing) return;
+      if (!acquireSyncLock()) return;
+
       const queue = getPendingQueue();
       if (!queue.length) {
+        releaseSyncLock();
         updateGlobalSyncBadge();
         return;
       }
 
-      isSyncing = true;
       updateGlobalSyncBadge();
 
       const item = queue[0];
+      const now = Date.now();
+
+      // Backoff check: if item failed or timed out recently, wait at least RETRY_BACKOFF_MS
+      if (item.lastAttempt && (now - item.lastAttempt < RETRY_BACKOFF_MS)) {
+        releaseSyncLock();
+        updateGlobalSyncBadge();
+        return;
+      }
+
+      item.lastAttempt = now;
+      savePendingQueue(queue);
+
       const targetUrl = item.targetUrl || (item.type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 28000);
@@ -719,36 +791,64 @@
           const currentQueue = getPendingQueue();
           const remaining = currentQueue.filter(q => q.id !== item.id);
           savePendingQueue(remaining);
-          isSyncing = false;
+          releaseSyncLock();
+
           if (remaining.length > 0) {
             setTimeout(processQueue, 300);
           } else {
             updateGlobalSyncBadge();
           }
         } else {
-          isSyncing = false;
+          item.retryCount = (item.retryCount || 0) + 1;
+          savePendingQueue(queue);
+          releaseSyncLock();
           updateGlobalSyncBadge();
         }
       } catch (err) {
         clearTimeout(timeoutId);
-        isSyncing = false;
+        item.retryCount = (item.retryCount || 0) + 1;
+        savePendingQueue(queue);
+        releaseSyncLock();
         updateGlobalSyncBadge();
       }
     }
 
     function enqueueTransaction(payload, targetUrl, type = 'expense') {
+      const sig = getPayloadSignature(payload, type);
+
+      // 1. Guard against double-tap or repeated clicks within DEDUP_WINDOW_MS
+      if (isDuplicateSubmission(sig)) {
+        console.warn('Blocked duplicate transaction submission:', sig);
+        return false;
+      }
+
       const queue = getPendingQueue();
+      // 2. Guard against duplicate item already pending in queue
+      const existingInQueue = queue.some(item => getPayloadSignature(item.payload, item.type) === sig);
+      if (existingInQueue) {
+        console.warn('Blocked duplicate item already in pending queue:', sig);
+        return false;
+      }
+
       const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
       const url = targetUrl || (type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
+
+      // Attach client_tx_id for traceability
+      payload.client_tx_id = txId;
+
       queue.push({
         id: txId,
         type: type,
+        sig: sig,
         targetUrl: url,
         payload: payload,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        lastAttempt: 0,
+        retryCount: 0
       });
       savePendingQueue(queue);
       processQueue();
+      return true;
     }
 
     function triggerManualSync() {
@@ -1016,6 +1116,11 @@
     // ==========================================
     document.getElementById('expenseForm').addEventListener('submit', function(e) {
       e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      if (submitBtn.disabled) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'กำลังบันทึก...';
+
       checkPinAndExecute(function() {
         var data = {
           type: document.getElementById('type').value,
@@ -1034,6 +1139,8 @@
           
           if (!odo || odo <= getLastFuelOdo()) {
             alert('กรุณากรอกเลขไมล์ให้ถูกต้อง (ต้องมากกว่า ' + getLastFuelOdo().toLocaleString() + ' กม.)');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'บันทึกรายจ่าย';
             return;
           }
 
@@ -1048,7 +1155,13 @@
         }
 
         // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        enqueueTransaction(data, GAS_URL, 'expense');
+        const enqueued = enqueueTransaction(data, GAS_URL, 'expense');
+        if (!enqueued) {
+          // If blocked as duplicate, re-enable button
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'บันทึกรายจ่าย';
+          return;
+        }
 
         // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
         var summaryHtml = 
@@ -1072,7 +1185,8 @@
           if (motoBox) motoBox.style.display = 'none';
           const errorEl = document.getElementById('moto-odo-error');
           if (errorEl) errorEl.style.display = 'none';
-          document.getElementById('submitBtn').disabled = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'บันทึกรายจ่าย';
         };
       });
     });
@@ -1082,6 +1196,13 @@
     // ==========================================
     document.getElementById('installmentForm').addEventListener('submit', function(e) {
       e.preventDefault();
+      const instSubmitBtn = document.getElementById('instSubmitBtn');
+      if (instSubmitBtn && instSubmitBtn.disabled) return;
+      if (instSubmitBtn) {
+        instSubmitBtn.disabled = true;
+        instSubmitBtn.textContent = 'กำลังบันทึก...';
+      }
+
       checkPinAndExecute(function() {
         var data = {
           type: 'installment',
@@ -1097,7 +1218,14 @@
         };
 
         // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        enqueueTransaction(data, GAS_URL, 'installment');
+        const enqueued = enqueueTransaction(data, GAS_URL, 'installment');
+        if (!enqueued) {
+          if (instSubmitBtn) {
+            instSubmitBtn.disabled = false;
+            instSubmitBtn.textContent = 'บันทึกรายการผ่อน';
+          }
+          return;
+        }
 
         // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
         var summaryHtml = 
@@ -1119,6 +1247,10 @@
           updateDateDefaults(true);
           document.getElementById('inst_interest').value = '0';
           calculateInstallment();
+          if (instSubmitBtn) {
+            instSubmitBtn.disabled = false;
+            instSubmitBtn.textContent = 'บันทึกรายการผ่อน';
+          }
         };
       });
     });
@@ -1227,6 +1359,12 @@
     // Submit AomAm Form (Optimistic UI + Background Sync)
     document.getElementById('aomamForm').addEventListener('submit', function(e) {
       e.preventDefault();
+      const aomamSubmitBtn = document.getElementById('aomamSubmitBtn');
+      if (aomamSubmitBtn && aomamSubmitBtn.disabled) return;
+      if (aomamSubmitBtn) {
+        aomamSubmitBtn.disabled = true;
+        aomamSubmitBtn.textContent = 'กำลังบันทึก...';
+      }
 
       var action = document.getElementById('aomam_action').value;
       var date = document.getElementById('aomam_date').value;
@@ -1235,6 +1373,10 @@
 
       if (amount <= 0) {
         alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+        if (aomamSubmitBtn) {
+          aomamSubmitBtn.disabled = false;
+          aomamSubmitBtn.textContent = 'บันทึกรายการ';
+        }
         return;
       }
 
@@ -1271,7 +1413,14 @@
       };
 
       // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที (Silent Background Sync)
-      enqueueTransaction(payload, getAomAmGasUrl(), 'aomam');
+      const enqueued = enqueueTransaction(payload, getAomAmGasUrl(), 'aomam');
+      if (!enqueued) {
+        if (aomamSubmitBtn) {
+          aomamSubmitBtn.disabled = false;
+          aomamSubmitBtn.textContent = 'บันทึกรายการ';
+        }
+        return;
+      }
 
       // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response < 10ms)
       showAomAmSummaryModal(payload, newBal);
@@ -1298,6 +1447,11 @@
         document.getElementById('aomam_action').value = 'ถอน';
         setAomAmAction('ถอน');
         updateDateDefaults(true);
+        const aomamSubmitBtn = document.getElementById('aomamSubmitBtn');
+        if (aomamSubmitBtn) {
+          aomamSubmitBtn.disabled = false;
+          aomamSubmitBtn.textContent = 'บันทึกรายการ';
+        }
       };
     }
 
