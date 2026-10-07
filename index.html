@@ -626,106 +626,20 @@
     }
 
     // ==========================================
-    // Background Queue & Sync Management (Optimistic UI)
+    // Server Connection & Direct Sync Status
     // ==========================================
-    // Background Queue & Sync Management (Optimistic UI + Deduplication Guard)
-    // ==========================================
-    const QUEUE_STORAGE_KEY = 'capitalflow_pending_queue';
-    const SYNC_LOCK_KEY = 'capitalflow_sync_lock';
-    const RECENT_SIGS_KEY = 'capitalflow_recent_sigs';
-    const LOCK_EXPIRY_MS = 32000;
-    const RETRY_BACKOFF_MS = 15000;
-    const DEDUP_WINDOW_MS = 15000;
-    let isSyncing = false;
-
-    function getPendingQueue() {
-      try {
-        const raw = localStorage.getItem(QUEUE_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : [];
-      } catch (e) {
-        return [];
-      }
-    }
-
-    function savePendingQueue(queue) {
-      try {
-        localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
-      } catch (e) {
-        console.error('Failed to save pending queue:', e);
-      }
-      updateGlobalSyncBadge();
-    }
-
-    function acquireSyncLock() {
-      if (isSyncing) return false;
-      const now = Date.now();
-      const lockVal = parseInt(localStorage.getItem(SYNC_LOCK_KEY) || '0', 10);
-      if (now - lockVal < LOCK_EXPIRY_MS) {
-        return false; // locked by ongoing sync
-      }
-      localStorage.setItem(SYNC_LOCK_KEY, String(now));
-      isSyncing = true;
-      return true;
-    }
-
-    function releaseSyncLock() {
-      isSyncing = false;
-      localStorage.removeItem(SYNC_LOCK_KEY);
-    }
-
-    function getPayloadSignature(payload, type) {
-      if (!payload) return '';
-      if (type === 'expense') {
-        return ['expense', payload.date || '', payload.category || '', payload.item || '', payload.amount || ''].join('::');
-      } else if (type === 'installment') {
-        return ['installment', payload.date || '', payload.item || '', payload.source || '', payload.total || '', payload.months || ''].join('::');
-      } else if (type === 'aomam') {
-        return ['aomam', payload.date || '', payload.action || '', payload.amount || '', payload.note || ''].join('::');
-      }
-      return JSON.stringify(payload);
-    }
-
-    function isDuplicateSubmission(sig) {
-      const now = Date.now();
-      let recents = [];
-      try {
-        recents = JSON.parse(sessionStorage.getItem(RECENT_SIGS_KEY) || '[]');
-      } catch (e) { recents = []; }
-
-      // Clean expired signatures
-      recents = recents.filter(r => (now - r.t) < DEDUP_WINDOW_MS);
-
-      const found = recents.some(r => r.s === sig);
-      if (found) {
-        sessionStorage.setItem(RECENT_SIGS_KEY, JSON.stringify(recents));
-        return true;
-      }
-
-      recents.push({ s: sig, t: now });
-      try {
-        sessionStorage.setItem(RECENT_SIGS_KEY, JSON.stringify(recents));
-      } catch (e) {}
-      return false;
-    }
-
-    function updateGlobalSyncBadge() {
+    function setGlobalSyncStatus(state, msg) {
       const dot = document.getElementById('global-sync-dot');
       const text = document.getElementById('global-sync-text');
       if (!dot || !text) return;
-
-      const queue = getPendingQueue();
-      const count = queue.length;
-
-      if (isSyncing) {
+      if (state === 'loading') {
         dot.className = 'sync-dot loading';
-        text.textContent = count > 0 ? `กำลังซิงค์... (เหลือ ${count} รายการ)` : 'กำลังซิงค์...';
-      } else if (count > 0) {
+      } else if (state === 'warning') {
         dot.className = 'sync-dot warning';
-        text.textContent = `รอซิงค์ (${count} รายการ) • แตะเพื่อส่ง`;
       } else {
         dot.className = 'sync-dot';
-        text.textContent = 'ซิงค์กับ Google Sheet เรียบร้อย';
       }
+      if (msg) text.textContent = msg;
     }
 
     function prewarmGAS() {
@@ -738,122 +652,8 @@
       } catch (e) {}
     }
 
-    async function processQueue() {
-      if (!acquireSyncLock()) return;
-
-      const queue = getPendingQueue();
-      if (!queue.length) {
-        releaseSyncLock();
-        updateGlobalSyncBadge();
-        return;
-      }
-
-      updateGlobalSyncBadge();
-
-      const item = queue[0];
-      const now = Date.now();
-
-      // Backoff check: if item failed or timed out recently, wait at least RETRY_BACKOFF_MS
-      if (item.lastAttempt && (now - item.lastAttempt < RETRY_BACKOFF_MS)) {
-        releaseSyncLock();
-        updateGlobalSyncBadge();
-        return;
-      }
-
-      item.lastAttempt = now;
-      savePendingQueue(queue);
-
-      const targetUrl = item.targetUrl || (item.type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 28000);
-
-      try {
-        const res = await fetch(targetUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(item.payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          // If aomam, update display with server response if valid JSON returned
-          if (item.type === 'aomam') {
-            try {
-              const resData = await res.json();
-              if (resData && resData.status === 'success') {
-                updateAomAmDisplay(resData);
-                localStorage.setItem('aomam_cache', JSON.stringify(resData));
-              }
-            } catch (jsonErr) {}
-          }
-
-          const currentQueue = getPendingQueue();
-          const remaining = currentQueue.filter(q => q.id !== item.id);
-          savePendingQueue(remaining);
-          releaseSyncLock();
-
-          if (remaining.length > 0) {
-            setTimeout(processQueue, 300);
-          } else {
-            updateGlobalSyncBadge();
-          }
-        } else {
-          item.retryCount = (item.retryCount || 0) + 1;
-          savePendingQueue(queue);
-          releaseSyncLock();
-          updateGlobalSyncBadge();
-        }
-      } catch (err) {
-        clearTimeout(timeoutId);
-        item.retryCount = (item.retryCount || 0) + 1;
-        savePendingQueue(queue);
-        releaseSyncLock();
-        updateGlobalSyncBadge();
-      }
-    }
-
-    function enqueueTransaction(payload, targetUrl, type = 'expense') {
-      const sig = getPayloadSignature(payload, type);
-
-      // 1. Guard against double-tap or repeated clicks within DEDUP_WINDOW_MS
-      if (isDuplicateSubmission(sig)) {
-        console.warn('Blocked duplicate transaction submission:', sig);
-        return false;
-      }
-
-      const queue = getPendingQueue();
-      // 2. Guard against duplicate item already pending in queue
-      const existingInQueue = queue.some(item => getPayloadSignature(item.payload, item.type) === sig);
-      if (existingInQueue) {
-        console.warn('Blocked duplicate item already in pending queue:', sig);
-        return false;
-      }
-
-      const txId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-      const url = targetUrl || (type === 'aomam' ? getAomAmGasUrl() : GAS_URL);
-
-      // Attach client_tx_id for traceability
-      payload.client_tx_id = txId;
-
-      queue.push({
-        id: txId,
-        type: type,
-        sig: sig,
-        targetUrl: url,
-        payload: payload,
-        createdAt: new Date().toISOString(),
-        lastAttempt: 0,
-        retryCount: 0
-      });
-      savePendingQueue(queue);
-      processQueue();
-      return true;
-    }
-
     function triggerManualSync() {
       prewarmGAS();
-      processQueue();
       const aomamTab = document.getElementById('aomam-tab-content');
       if (aomamTab && aomamTab.classList.contains('active')) {
         fetchAomAmSummary();
@@ -915,16 +715,11 @@
       if (document.visibilityState === 'visible') {
         updateDateDefaults(false);
         prewarmGAS();
-        processQueue();
       }
     });
     window.addEventListener('focus', function() {
       updateDateDefaults(false);
       prewarmGAS();
-      processQueue();
-    });
-    window.addEventListener('online', function() {
-      processQueue();
     });
 
     // ==========================================
@@ -1112,14 +907,12 @@
     catSelect.dispatchEvent(new Event('change'));
 
     // ==========================================
-    // ส่งข้อมูลฟอร์ม Expense (Optimistic UI + Background Sync)
+    // ส่งข้อมูลฟอร์ม Expense (Direct Fetch & Modal Confirmation)
     // ==========================================
     document.getElementById('expenseForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const submitBtn = document.getElementById('submitBtn');
       if (submitBtn.disabled) return;
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'กำลังบันทึก...';
 
       checkPinAndExecute(function() {
         var data = {
@@ -1139,8 +932,6 @@
           
           if (!odo || odo <= getLastFuelOdo()) {
             alert('กรุณากรอกเลขไมล์ให้ถูกต้อง (ต้องมากกว่า ' + getLastFuelOdo().toLocaleString() + ' กม.)');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'บันทึกรายจ่าย';
             return;
           }
 
@@ -1154,54 +945,69 @@
           data.item = `น้ำมัน [ODO:${odo},PPL:${ppl}]`;
         }
 
-        // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        const enqueued = enqueueTransaction(data, GAS_URL, 'expense');
-        if (!enqueued) {
-          // If blocked as duplicate, re-enable button
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'กำลังบันทึก...';
+        setGlobalSyncStatus('loading', 'กำลังส่งข้อมูลไป Google Sheet...');
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data),
+          signal: controller.signal
+        })
+        .then(function(res) {
+          clearTimeout(timeoutId);
+          return res.text();
+        })
+        .then(function(text) {
+          setGlobalSyncStatus('idle', 'บันทึกสำเร็จเรียบร้อย');
+
+          var summaryHtml = 
+            '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
+            '<b>วันที่:</b> ' + data.date + '<br>' +
+            '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
+            '<b>รายการ:</b> ' + (data.category === 'น้ำมัน' ? 'น้ำมัน NMAX' : data.item) + '<br>' +
+            (data.category === 'น้ำมัน' && data.odometer ? ('<b>เลขไมล์:</b> ' + Number(data.odometer).toLocaleString() + ' กม. (ราคา ' + data.price_per_liter + ' บ./ลิตร)<br>') : '') +
+            '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
+          
+          document.getElementById('summaryDetails').innerHTML = summaryHtml;
+          var modal = document.getElementById('summaryModal');
+          modal.style.display = 'flex';
+
+          document.getElementById('closeModalBtn').onclick = function() {
+            modal.style.display = 'none';
+            document.getElementById('expenseForm').reset();
+            updateDateDefaults(true);
+            typeSelect.dispatchEvent(new Event('change'));
+            const motoBox = document.getElementById('moto-fuel-inputs');
+            if (motoBox) motoBox.style.display = 'none';
+            const errorEl = document.getElementById('moto-odo-error');
+            if (errorEl) errorEl.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'บันทึกรายจ่าย';
+            setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
+          };
+        })
+        .catch(function(error) {
+          clearTimeout(timeoutId);
           submitBtn.disabled = false;
           submitBtn.textContent = 'บันทึกรายจ่าย';
-          return;
-        }
-
-        // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
-        var summaryHtml = 
-          '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
-          '<b>วันที่:</b> ' + data.date + '<br>' +
-          '<b>หมวดหมู่:</b> ' + data.category + '<br>' +
-          '<b>รายการ:</b> ' + (data.category === 'น้ำมัน' ? 'น้ำมัน NMAX' : data.item) + '<br>' +
-          (data.category === 'น้ำมัน' && data.odometer ? ('<b>เลขไมล์:</b> ' + Number(data.odometer).toLocaleString() + ' กม. (ราคา ' + data.price_per_liter + ' บ./ลิตร)<br>') : '') +
-          '<b>จำนวนเงิน:</b> <span style="color:#10b981;font-weight:600;">' + data.amount + ' บาท</span>';
-        
-        document.getElementById('summaryDetails').innerHTML = summaryHtml;
-        var modal = document.getElementById('summaryModal');
-        modal.style.display = 'flex';
-
-        document.getElementById('closeModalBtn').onclick = function() {
-          modal.style.display = 'none';
-          document.getElementById('expenseForm').reset();
-          updateDateDefaults(true);
-          typeSelect.dispatchEvent(new Event('change'));
-          const motoBox = document.getElementById('moto-fuel-inputs');
-          if (motoBox) motoBox.style.display = 'none';
-          const errorEl = document.getElementById('moto-odo-error');
-          if (errorEl) errorEl.style.display = 'none';
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'บันทึกรายจ่าย';
-        };
+          setGlobalSyncStatus('warning', 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+          alert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + (error.name === 'AbortError' ? 'หมดเวลาเชื่อมต่อ (Timeout)' : error.message) + '\nรายการยังไม่ถูกบันทึก กรุณากดลองใหม่อีกครั้ง');
+        });
       });
     });
 
     // ==========================================
-    // ส่งข้อมูลฟอร์ม Installment (Optimistic UI + Background Sync)
+    // ส่งข้อมูลฟอร์ม Installment (Direct Fetch & Modal Confirmation)
     // ==========================================
     document.getElementById('installmentForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const instSubmitBtn = document.getElementById('instSubmitBtn');
       if (instSubmitBtn && instSubmitBtn.disabled) return;
-      if (instSubmitBtn) {
-        instSubmitBtn.disabled = true;
-        instSubmitBtn.textContent = 'กำลังบันทึก...';
-      }
 
       checkPinAndExecute(function() {
         var data = {
@@ -1217,41 +1023,63 @@
           monthly_amount: document.getElementById('inst_monthly').value
         };
 
-        // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที
-        const enqueued = enqueueTransaction(data, GAS_URL, 'installment');
-        if (!enqueued) {
-          if (instSubmitBtn) {
-            instSubmitBtn.disabled = false;
-            instSubmitBtn.textContent = 'บันทึกรายการผ่อน';
-          }
-          return;
+        if (instSubmitBtn) {
+          instSubmitBtn.disabled = true;
+          instSubmitBtn.textContent = 'กำลังบันทึก...';
         }
+        setGlobalSyncStatus('loading', 'กำลังส่งข้อมูลไป Google Sheet...');
 
-        // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response)
-        var summaryHtml = 
-          '<b>ประเภท:</b> ผ่อนชำระ (Installment)<br>' +
-          '<b>วันที่:</b> ' + data.date + '<br>' +
-          '<b>รายการ:</b> ' + data.item + '<br>' +
-          '<b>บัตร/ผู้ให้บริการ:</b> ' + data.source + '<br>' +
-          '<b>ราคารวม:</b> ' + data.total + ' บาท (' + data.months + ' เดือน)<br>' +
-          '<b>เริ่ม-สิ้นสุด:</b> ' + data.start_month + ' ถึง ' + data.end_month + '<br>' +
-          '<b>ผ่อนเดือนละ:</b> <span style="color:#60a5fa;font-weight:600;">' + data.monthly_amount + ' บาท</span>';
-        
-        document.getElementById('summaryDetails').innerHTML = summaryHtml;
-        var modal = document.getElementById('summaryModal');
-        modal.style.display = 'flex';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
 
-        document.getElementById('closeModalBtn').onclick = function() {
-          modal.style.display = 'none';
-          document.getElementById('installmentForm').reset();
-          updateDateDefaults(true);
-          document.getElementById('inst_interest').value = '0';
-          calculateInstallment();
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(data),
+          signal: controller.signal
+        })
+        .then(function(res) {
+          clearTimeout(timeoutId);
+          return res.text();
+        })
+        .then(function(text) {
+          setGlobalSyncStatus('idle', 'บันทึกสำเร็จเรียบร้อย');
+
+          var summaryHtml = 
+            '<b>ประเภท:</b> ผ่อนชำระ (Installment)<br>' +
+            '<b>วันที่:</b> ' + data.date + '<br>' +
+            '<b>รายการ:</b> ' + data.item + '<br>' +
+            '<b>บัตร/ผู้ให้บริการ:</b> ' + data.source + '<br>' +
+            '<b>ราคารวม:</b> ' + data.total + ' บาท (' + data.months + ' เดือน)<br>' +
+            '<b>เริ่ม-สิ้นสุด:</b> ' + data.start_month + ' ถึง ' + data.end_month + '<br>' +
+            '<b>ผ่อนเดือนละ:</b> <span style="color:#60a5fa;font-weight:600;">' + data.monthly_amount + ' บาท</span>';
+          
+          document.getElementById('summaryDetails').innerHTML = summaryHtml;
+          var modal = document.getElementById('summaryModal');
+          modal.style.display = 'flex';
+
+          document.getElementById('closeModalBtn').onclick = function() {
+            modal.style.display = 'none';
+            document.getElementById('installmentForm').reset();
+            updateDateDefaults(true);
+            document.getElementById('inst_interest').value = '0';
+            calculateInstallment();
+            if (instSubmitBtn) {
+              instSubmitBtn.disabled = false;
+              instSubmitBtn.textContent = 'บันทึกรายการผ่อน';
+            }
+            setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
+          };
+        })
+        .catch(function(error) {
+          clearTimeout(timeoutId);
           if (instSubmitBtn) {
             instSubmitBtn.disabled = false;
             instSubmitBtn.textContent = 'บันทึกรายการผ่อน';
           }
-        };
+          setGlobalSyncStatus('warning', 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+          alert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + (error.name === 'AbortError' ? 'หมดเวลาเชื่อมต่อ (Timeout)' : error.message) + '\nรายการยังไม่ถูกบันทึก กรุณากดลองใหม่อีกครั้ง');
+        });
       });
     });
 
@@ -1356,15 +1184,13 @@
         .catch(function(err) {});
     }
 
-    // Submit AomAm Form (Optimistic UI + Background Sync)
+    // ==========================================
+    // ส่งข้อมูลฟอร์ม AomAm (Direct Fetch & Modal Confirmation)
+    // ==========================================
     document.getElementById('aomamForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const aomamSubmitBtn = document.getElementById('aomamSubmitBtn');
       if (aomamSubmitBtn && aomamSubmitBtn.disabled) return;
-      if (aomamSubmitBtn) {
-        aomamSubmitBtn.disabled = true;
-        aomamSubmitBtn.textContent = 'กำลังบันทึก...';
-      }
 
       var action = document.getElementById('aomam_action').value;
       var date = document.getElementById('aomam_date').value;
@@ -1373,14 +1199,9 @@
 
       if (amount <= 0) {
         alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
-        if (aomamSubmitBtn) {
-          aomamSubmitBtn.disabled = false;
-          aomamSubmitBtn.textContent = 'บันทึกรายการ';
-        }
         return;
       }
 
-      // Optimistic balance calculation
       var cached = {};
       try {
         cached = JSON.parse(localStorage.getItem('aomam_cache') || '{}');
@@ -1394,17 +1215,7 @@
       var newDep = (action === 'ฝาก') ? (currentDep + amount) : currentDep;
       var newWdr = (action === 'ถอน') ? (currentWdr + amount) : currentWdr;
 
-      var optData = {
-        balance: newBal,
-        balanceFormatted: '฿' + newBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        totalDeposit: newDep,
-        totalDepositFormatted: '฿' + newDep.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        totalWithdraw: newWdr,
-        totalWithdrawFormatted: '฿' + newWdr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      };
-      updateAomAmDisplay(optData);
-      localStorage.setItem('aomam_cache', JSON.stringify(optData));
-
+      var targetUrl = getAomAmGasUrl();
       var payload = {
         action: action,
         date: date,
@@ -1412,18 +1223,53 @@
         note: note
       };
 
-      // บันทึกลงคิวในเครื่องและเริ่มซิงค์เบื้องหลังทันที (Silent Background Sync)
-      const enqueued = enqueueTransaction(payload, getAomAmGasUrl(), 'aomam');
-      if (!enqueued) {
+      if (aomamSubmitBtn) {
+        aomamSubmitBtn.disabled = true;
+        aomamSubmitBtn.textContent = 'กำลังบันทึก...';
+      }
+      setGlobalSyncStatus('loading', 'กำลังส่งข้อมูลไป Google Sheet...');
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+      fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      })
+      .then(function(res) {
+        clearTimeout(timeoutId);
+        return res.json();
+      })
+      .then(function(resData) {
+        if (resData && resData.status === 'success') {
+          updateAomAmDisplay(resData);
+          localStorage.setItem('aomam_cache', JSON.stringify(resData));
+        } else {
+          var optData = {
+            balance: newBal,
+            balanceFormatted: '฿' + newBal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            totalDeposit: newDep,
+            totalDepositFormatted: '฿' + newDep.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            totalWithdraw: newWdr,
+            totalWithdrawFormatted: '฿' + newWdr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          };
+          updateAomAmDisplay(optData);
+          localStorage.setItem('aomam_cache', JSON.stringify(optData));
+        }
+        setGlobalSyncStatus('idle', 'บันทึกสำเร็จเรียบร้อย');
+        showAomAmSummaryModal(payload, (resData && typeof resData.balance !== 'undefined') ? resData.balance : newBal);
+      })
+      .catch(function(error) {
+        clearTimeout(timeoutId);
         if (aomamSubmitBtn) {
           aomamSubmitBtn.disabled = false;
           aomamSubmitBtn.textContent = 'บันทึกรายการ';
         }
-        return;
-      }
-
-      // แสดงผลลัพธ์สำเร็จทันที (Optimistic Response < 10ms)
-      showAomAmSummaryModal(payload, newBal);
+        setGlobalSyncStatus('warning', 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        alert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + (error.name === 'AbortError' ? 'หมดเวลาเชื่อมต่อ (Timeout)' : error.message) + '\nรายการยังไม่ถูกบันทึก กรุณากดลองใหม่อีกครั้ง');
+      });
     });
 
     function showAomAmSummaryModal(payload, bal) {
@@ -1452,13 +1298,19 @@
           aomamSubmitBtn.disabled = false;
           aomamSubmitBtn.textContent = 'บันทึกรายการ';
         }
+        setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
       };
     }
 
-    // เริ่มต้น Pre-warm, ตรวจสอบคิว และโหลดแคชทันทีเมื่อเปิดหน้าเว็บ
+    // เคลียร์ค้างส่งเก่าออกจากเครื่องเพื่อตัดโอกาสเบิ้ลรายการ 100%
+    try {
+      localStorage.removeItem('capitalflow_pending_queue');
+      localStorage.removeItem('capitalflow_sync_lock');
+    } catch (e) {}
+
+    // เริ่มต้น Pre-warm และโหลดแคชทันทีเมื่อเปิดหน้าเว็บ
     prewarmGAS();
-    updateGlobalSyncBadge();
-    processQueue();
+    setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
     loadCachedAomAm();
   </script>
 </body>
