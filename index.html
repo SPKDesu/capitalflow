@@ -1974,32 +1974,19 @@
         saveStoredLoanPeople(people);
       }
 
-      // ตรวจสอบว่าคนนี้มีหนี้ค้างอยู่แล้วหรือไม่
-      const existingIdx = loansData.findIndex(l => l.person.toLowerCase() === person.toLowerCase());
+      // เพิ่มรายการใหม่แยกเป็นแต่ละยอด (ไม่รวมยอดอัตโนมัติ เพื่อให้แยกตามวันที่และจำนวนเงินของแต่ละครั้งได้ชัดเจน)
       const nowStr = getBangkokNowString();
       const shortDate = formatShortDate(date);
 
-      if (existingIdx !== -1) {
-        // รวมยอดเข้าการ์ดเดิม
-        loansData[existingIdx].amount = (Number(loansData[existingIdx].amount) || 0) + amount;
-        loansData[existingIdx].updatedAt = nowStr;
-        const addHistory = `ยืมเพิ่ม ${amount.toLocaleString()} (${shortDate})`;
-        loansData[existingIdx].history = loansData[existingIdx].history ? `${loansData[existingIdx].history} | ${addHistory}` : addHistory;
-        if (note) {
-          loansData[existingIdx].note = loansData[existingIdx].note ? `${loansData[existingIdx].note}, ${note}` : note;
-        }
-      } else {
-        // เพิ่มคนใหม่
-        loansData.unshift({
-          id: 'loan_' + Date.now(),
-          date: date,
-          person: person,
-          amount: amount,
-          note: note,
-          updatedAt: nowStr,
-          history: `ยืม ${amount.toLocaleString()} (${shortDate})`
-        });
-      }
+      loansData.unshift({
+        id: 'loan_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        date: date,
+        person: person,
+        amount: amount,
+        note: note,
+        updatedAt: nowStr,
+        history: `ยืม ${amount.toLocaleString()} (${shortDate})`
+      });
 
       saveLoansData();
       syncLoansToGAS();
