@@ -1947,22 +1947,75 @@
         const latestDate = loan.items.reduce((max, it) => (!max || it.date > max ? it.date : max), loan.date || '');
         const shortDate = formatShortDate(latestDate);
 
-        // แสดงรายการย่อยแต่ละยอด
+        // คำนวณสรุปยอด: ยืมรวม, คงค้าง, คืนแล้ว
+        const totalBorrow = loan.items.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+        const remainingBalance = Number(loan.amount) || 0;
+        const totalRepaid = Math.max(0, totalBorrow - remainingBalance);
+
+        // แสดงรายการย่อยที่ยืม (แสดง วันที่ โน้ต จำนวนเงิน อย่างเป็นระเบียบ)
         let itemsHtml = '';
         if (loan.items && loan.items.length > 0) {
           itemsHtml += '<div style="margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px dashed rgba(255, 255, 255, 0.08); font-size: 0.75rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 4px;">';
-          loan.items.forEach((it, i) => {
+          loan.items.forEach((it) => {
             const itDate = formatShortDate(it.date);
             const itAmt = (Number(it.amount) || 0).toLocaleString();
             const itNote = it.note ? ` (${escapeHtml(it.note)})` : '';
             itemsHtml += `
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: #94a3b8;">• ยอดที่ ${i + 1}: ${itDate}${itNote}</span>
+                <span style="color: #cbd5e1;">• ${itDate}${itNote}</span>
                 <span style="font-weight: 600; color: #f59e0b;">฿${itAmt}</span>
               </div>
             `;
           });
           itemsHtml += '</div>';
+        }
+
+        // กรองเฉพาะประวัติการคืนเงิน (ตัดข้อความยืมซ้ำซ้อนทิ้ง 100%)
+        const cleanHistory = (loan.history || '').replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
+        const historyParts = cleanHistory.split('|').map(s => s.trim()).filter(Boolean);
+        const repayments = historyParts.filter(s => /คืน/i.test(s));
+
+        let historyHtml = '';
+        if (repayments.length > 0) {
+          const latestRep = repayments[repayments.length - 1];
+          const repSummaryText = repayments.length === 1
+            ? `1 ครั้ง: ${escapeHtml(latestRep)}`
+            : `${repayments.length} ครั้ง • รวม ฿${totalRepaid.toLocaleString()}`;
+
+          const repListHtml = repayments.map(rep => {
+            const m = rep.match(/คืน(?:แล้ว|ครบ)?\s+([\d,]+(?:\.\d+)?)\s*(?:\(([^)]+)\))?/i);
+            if (m) {
+              const amt = parseFloat(m[1].replace(/,/g, '')).toLocaleString();
+              const d = m[2] ? ` (${m[2]})` : '';
+              return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+                  <span style="color: #94a3b8;">✓ คืนแล้ว${d}</span>
+                  <span style="color: #34d399; font-weight: 500;">-฿${amt}</span>
+                </div>
+              `;
+            }
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 0;">
+                <span style="color: #94a3b8;">✓ ${escapeHtml(rep)}</span>
+              </div>
+            `;
+          }).join('');
+
+          historyHtml = `
+            <div class="loan-history-accordion" style="margin-top: 0.5rem;">
+              <button type="button" class="btn-toggle-history" onclick="toggleLoanHistory('${loan.id}')" style="width: 100%; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 10px; color: #94a3b8; font-size: 0.73rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                <span style="display: flex; align-items: center; gap: 5px;">
+                  <span>📜</span>
+                  <span style="color: #34d399; font-weight: 500;">ประวัติการคืน</span>
+                  <span style="color: #94a3b8; font-size: 0.7rem;">(${repSummaryText})</span>
+                </span>
+                <span id="history-arrow-${loan.id}" style="transition: transform 0.2s ease; font-size: 0.65rem; color: #64748b; margin-left: 6px;">▼</span>
+              </button>
+              <div id="history-content-${loan.id}" style="display: none; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-top: none; border-radius: 0 0 8px 8px; padding: 6px 10px; font-size: 0.72rem; color: #cbd5e1; flex-direction: column; gap: 3px;">
+                ${repListHtml}
+              </div>
+            </div>
+          `;
         }
 
         html += `
@@ -1972,20 +2025,26 @@
                 <span>👤</span> ${escapeHtml(loan.person)}
                 <span class="btn-edit-icon" onclick="openEditLoanModal('${loan.id}')" title="แก้ไขแต่ละยอด">✏️ แก้ไข</span>
               </span>
-              <span class="loan-date-badge">${loan.items.length > 1 ? `${loan.items.length} ยอด (ล่าสุด ${shortDate})` : `ยืมเมื่อ ${shortDate}`}</span>
+              <span class="loan-date-badge">${loan.items.length > 1 ? `${loan.items.length} รายการ (ล่าสุด ${shortDate})` : `ยืมเมื่อ ${shortDate}`}</span>
             </div>
 
-            <div class="loan-card-body" style="margin-bottom: 0.2rem;">
-              <span class="loan-card-note">${loan.items.length > 1 ? '<span style="color:#94a3b8;">ยอดคงค้างรวม</span>' : (loan.note ? escapeHtml(loan.note) : '<span style="color:#64748b;">(ไม่ระบุโน้ต)</span>')}</span>
+            <div class="loan-card-body" style="margin-bottom: 0.35rem; align-items: flex-end;">
+              <div>
+                <div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 2px;">ยอดคงค้างสุทธิ</div>
+                ${totalRepaid > 0 ? `
+                  <div style="font-size: 0.7rem; color: #64748b; display: flex; gap: 5px; align-items: center;">
+                    <span>ยืมรวม ฿${totalBorrow.toLocaleString()}</span>
+                    <span>•</span>
+                    <span style="color: #34d399;">คืนแล้ว ฿${totalRepaid.toLocaleString()}</span>
+                  </div>
+                ` : (loan.items.length === 1 && loan.items[0].note ? `<div style="font-size: 0.72rem; color: #94a3b8;">${escapeHtml(loan.items[0].note)}</div>` : '')}
+              </div>
               <span class="loan-card-amount">฿${formattedAmount}</span>
             </div>
 
             ${itemsHtml}
 
-            ${(() => {
-              const cleanHistory = (loan.history || '').replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
-              return cleanHistory ? `<div class="loan-card-history" style="margin-top: 0.45rem;">${escapeHtml(cleanHistory)}</div>` : '';
-            })()}
+            ${historyHtml}
 
             <div class="loan-card-actions" style="margin-top: 0.65rem;">
               <button type="button" class="btn-loan-clear" onclick="clearLoanFull('${loan.id}')">
@@ -2206,6 +2265,22 @@
       if (box.classList.contains('active')) {
         const input = document.getElementById(`partial-input-${id}`);
         if (input) input.focus();
+      }
+    }
+
+    // ฟังก์ชัน พับ/ขยาย ประวัติการคืนเงิน (Accordion)
+    function toggleLoanHistory(id) {
+      const content = document.getElementById(`history-content-${id}`);
+      const arrow = document.getElementById(`history-arrow-${id}`);
+      const btn = arrow ? arrow.closest('.btn-toggle-history') : null;
+      if (!content) return;
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'flex' : 'none';
+      if (arrow) {
+        arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
+      if (btn) {
+        btn.style.borderRadius = isHidden ? '8px 8px 0 0' : '8px';
       }
     }
 
