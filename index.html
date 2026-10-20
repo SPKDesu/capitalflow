@@ -53,16 +53,17 @@
       background: rgba(15, 23, 42, 0.6);
       padding: 4px;
       border-radius: 14px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       border: 1px solid var(--border);
+      gap: 3px;
     }
     .tab-btn {
       flex: 1;
-      padding: 0.65rem 0.5rem;
+      padding: 0.6rem 0.25rem;
       border: none;
       background: transparent;
       color: var(--text-muted);
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       font-weight: 500;
       border-radius: 10px;
       cursor: pointer;
@@ -70,13 +71,28 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 4px;
+      white-space: nowrap;
+      position: relative;
     }
     .tab-btn.active {
       background: linear-gradient(135deg, var(--accent), var(--accent-purple));
       color: #ffffff;
       font-weight: 600;
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    .tab-badge {
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 1px 5px;
+      line-height: 1.1;
+      display: inline-block;
+      min-width: 15px;
+      text-align: center;
+      box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
     }
 
     .form-group { margin-bottom: 1.1rem; }
@@ -367,6 +383,271 @@
       color: #60a5fa;
     }
 
+    /* Loan Tracker Styles */
+    .loan-summary-card {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 16px;
+      padding: 1.1rem 1rem;
+      margin-bottom: 1.1rem;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+    .loan-summary-card .summary-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      letter-spacing: 0.5px;
+    }
+    .loan-summary-card .summary-value {
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: #f59e0b;
+      font-feature-settings: "tnum";
+      line-height: 1.2;
+    }
+    .loan-summary-card .summary-sub {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      margin-top: 0.3rem;
+    }
+
+    .undo-toast {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid #10b981;
+      border-radius: 12px;
+      padding: 0.65rem 0.85rem;
+      margin-bottom: 1rem;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+      animation: slideDown 0.25s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .undo-toast-text {
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      flex: 1;
+      line-height: 1.3;
+    }
+    .undo-toast-btn {
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .loan-cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .loan-card {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 0.85rem 0.95rem;
+      transition: all 0.2s ease;
+    }
+    .loan-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.35rem;
+    }
+    .loan-person-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .loan-date-badge {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .loan-card-body {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+    .loan-card-note {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .loan-card-amount {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #f59e0b;
+      font-feature-settings: "tnum";
+    }
+    .loan-card-history {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-bottom: 0.65rem;
+      line-height: 1.35;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
+    .loan-card-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn-loan-clear {
+      flex: 1.2;
+      padding: 0.55rem 0.4rem;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      transition: transform 0.15s;
+    }
+    .btn-loan-clear:active { transform: scale(0.97); }
+    .btn-loan-partial {
+      flex: 1;
+      padding: 0.55rem 0.4rem;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 10px;
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: transform 0.15s;
+    }
+    .btn-loan-partial:active { transform: scale(0.97); }
+    .loan-partial-box {
+      margin-top: 0.65rem;
+      padding-top: 0.65rem;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      display: none;
+    }
+    .loan-partial-box.active { display: block; }
+    .loan-partial-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .loan-partial-input {
+      flex: 1;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.88rem;
+      height: 38px;
+    }
+    .btn-loan-repay-confirm {
+      padding: 0.45rem 0.85rem;
+      border: none;
+      border-radius: 10px;
+      background: #3b82f6;
+      color: #ffffff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      height: 38px;
+      white-space: nowrap;
+    }
+    .loan-empty-state {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .quick-amount-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-top: 0.45rem;
+    }
+    .amount-chip {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 0.45rem 0.2rem;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .amount-chip:active {
+      transform: scale(0.95);
+      background: rgba(245, 158, 11, 0.25);
+      border-color: #f59e0b;
+      color: #fbbf24;
+    }
+    .amount-chip.clear-btn {
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+    .person-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 14px;
+      padding: 3px 8px;
+      font-size: 0.76rem;
+      color: #93c5fd;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+    .person-chip:active {
+      transform: scale(0.95);
+      background: rgba(59, 130, 246, 0.3);
+    }
+    .person-chip .remove-person {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      padding-left: 2px;
+      font-weight: 700;
+    }
+    .person-chip .remove-person:hover {
+      color: #f87171;
+    }
+
     @media (max-width: 440px) {
       body {
         padding: 0.75rem 0.5rem;
@@ -375,11 +656,27 @@
         padding: 1.15rem 0.85rem;
         border-radius: 16px;
       }
+      .tab-nav {
+        gap: 2px;
+        padding: 3px;
+      }
       .tab-btn {
-        padding: 0.55rem 0.2rem;
-        font-size: 0.82rem;
-        gap: 3px;
+        padding: 0.5rem 0.12rem;
+        font-size: 0.75rem;
+        gap: 2px;
         white-space: nowrap;
+      }
+      .tab-btn span.tab-title {
+        letter-spacing: -0.2px;
+      }
+      .tab-badge {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+        min-width: 13px;
+      }
+      .amount-chip {
+        font-size: 0.72rem;
+        padding: 0.4rem 0.1rem;
       }
     }
   </style>
@@ -395,13 +692,17 @@
     <!-- Tab Navigation -->
     <div class="tab-nav">
       <button type="button" class="tab-btn active" id="tab-expense-btn" onclick="switchTab('expense')">
-        📝 <span>รายจ่ายด่วน</span>
+        📝 <span class="tab-title">รายจ่าย</span>
       </button>
       <button type="button" class="tab-btn" id="tab-installment-btn" onclick="switchTab('installment')">
-        💳 <span>ผ่อนชำระ</span>
+        💳 <span class="tab-title">ผ่อนชำระ</span>
       </button>
       <button type="button" class="tab-btn" id="tab-aomam-btn" onclick="switchTab('aomam')">
-        👛 <span>เงินอ๋อมแอ๋ม</span>
+        👛 <span class="tab-title">อ๋อมแอ๋ม</span>
+      </button>
+      <button type="button" class="tab-btn" id="tab-loan-btn" onclick="switchTab('loan')">
+        🤝 <span class="tab-title">ยืม-คืน</span>
+        <span id="loan-badge" class="tab-badge" style="display:none;">0</span>
       </button>
     </div>
 
@@ -588,6 +889,74 @@
         <div id="aomamStatus" class="status-msg">✅ บันทึกสำเร็จแล้ว!</div>
       </form>
     </div>
+
+    <!-- Tab 4: บันทึกยืม-คืนด่วน (Short-term Loan Tracker) -->
+    <div id="loan-tab-content" class="tab-content">
+      <!-- สรุปยอดเงินค้างชำระทั้งหมด -->
+      <div class="loan-summary-card">
+        <div class="summary-label">ยอดรอเคลียร์ทั้งหมด</div>
+        <div class="summary-value" id="loan-total-amount">฿0.00</div>
+        <div class="summary-sub" id="loan-total-count">ไม่มีรายการค้างชำระ</div>
+      </div>
+
+      <!-- แถบ Undo ชั่วคราว -->
+      <div id="loan-undo-toast" class="undo-toast">
+        <div class="undo-toast-text" id="loan-undo-text">เคลียร์หนี้เรียบร้อย</div>
+        <button type="button" class="undo-toast-btn" onclick="undoLastClear()">↩️ เลิกทำ (Undo)</button>
+      </div>
+
+      <!-- รายการคนค้างชำระ -->
+      <div style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>👥 คนค้างชำระ</span>
+        <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 400;">กดเคลียร์เพื่อลบออกทันที</span>
+      </div>
+      <div id="loan-cards-container" class="loan-cards-list">
+        <!-- Filled by JS -->
+      </div>
+
+      <!-- ฟอร์มบันทึกคนยืมใหม่ -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 16px; padding: 1.1rem 0.95rem; margin-top: 1rem;">
+        <div style="font-size: 0.92rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.85rem; display: flex; align-items: center; gap: 6px;">
+          <span>➕</span> บันทึกคนยืมใหม่
+        </div>
+
+        <form id="loanForm" onsubmit="submitLoanForm(event)">
+          <div class="form-group">
+            <label>วันที่ (Date)</label>
+            <input type="date" id="loan_date" required>
+          </div>
+
+          <div class="form-group">
+            <label>ชื่อคนยืม (Name)</label>
+            <input type="text" id="loan_person" placeholder="เช่น ต้น, พี่เอก, บิ๊ก" required autocomplete="off">
+            <div id="loan-person-chips" class="quick-tags" style="margin-top: 0.45rem;">
+              <!-- Filled by JS from localStorage -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>จำนวนเงิน (Amount)</label>
+            <input type="number" id="loan_amount" placeholder="0.00" step="1" inputmode="numeric" required>
+            <div class="quick-amount-grid">
+              <span class="amount-chip" onclick="addLoanQuickAmount(100)">+100</span>
+              <span class="amount-chip" onclick="addLoanQuickAmount(200)">+200</span>
+              <span class="amount-chip" onclick="addLoanQuickAmount(500)">+500</span>
+              <span class="amount-chip" onclick="addLoanQuickAmount(1000)">+1,000</span>
+              <span class="amount-chip clear-btn" onclick="clearLoanAmount()">ล้าง</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>หมายเหตุสั้นๆ (Note - ไม่บังคับ)</label>
+            <input type="text" id="loan_note" placeholder="เช่น ค่าข้าว, โอนสำรอง" autocomplete="off">
+          </div>
+
+          <button type="submit" class="btn-submit" id="loanSubmitBtn" style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
+            ➕ บันทึกคนยืม
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Summary Modal -->
@@ -658,6 +1027,10 @@
       if (aomamTab && aomamTab.classList.contains('active')) {
         fetchAomAmSummary();
       }
+      const loanTab = document.getElementById('loan-tab-content');
+      if (loanTab && loanTab.classList.contains('active')) {
+        fetchLoansFromGAS();
+      }
     }
 
     // ==========================================
@@ -689,6 +1062,7 @@
       const instDateInput = document.getElementById('inst_date');
       const instStartInput = document.getElementById('inst_start');
       const aomamDateInput = document.getElementById('aomam_date');
+      const loanDateInput = document.getElementById('loan_date');
 
       if (force || !dateInput.value || dateInput.value === lastDefaultDate) {
         dateInput.value = currentLocalDate;
@@ -701,6 +1075,9 @@
       }
       if (aomamDateInput && (force || !aomamDateInput.value || aomamDateInput.value === lastDefaultDate)) {
         aomamDateInput.value = currentLocalDate;
+      }
+      if (loanDateInput && (force || !loanDateInput.value || loanDateInput.value === lastDefaultDate)) {
+        loanDateInput.value = currentLocalDate;
       }
 
       lastDefaultDate = currentLocalDate;
@@ -740,6 +1117,11 @@
         document.getElementById('tab-aomam-btn').classList.add('active');
         document.getElementById('aomam-tab-content').classList.add('active');
         fetchAomAmSummary();
+      } else if (tabName === 'loan') {
+        document.getElementById('tab-loan-btn').classList.add('active');
+        document.getElementById('loan-tab-content').classList.add('active');
+        renderLoanCards();
+        fetchLoansFromGAS();
       }
     }
 
@@ -1302,6 +1684,393 @@
       };
     }
 
+    // ==========================================
+    // จัดการแท็บยืม-คืนด่วน (Short-term Loan Tracker)
+    // ==========================================
+    let loansData = [];
+    let lastClearedLoan = null;
+    let undoTimer = null;
+
+    function getBangkokNowString() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${day} ${hh}:${mm}`;
+    }
+
+    function formatShortDate(dateStr) {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      if (parts.length < 3) return dateStr;
+      const thaiMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const mIdx = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      return `${d} ${thaiMonths[mIdx] || parts[1]}`;
+    }
+
+    function loadCachedLoans() {
+      try {
+        const raw = localStorage.getItem('capitalflow_loans_data');
+        if (raw) {
+          loansData = JSON.parse(raw);
+        } else {
+          loansData = [];
+        }
+      } catch (e) {
+        loansData = [];
+      }
+      renderLoanCards();
+      renderPersonChips();
+    }
+
+    function saveLoansData() {
+      localStorage.setItem('capitalflow_loans_data', JSON.stringify(loansData));
+      renderLoanCards();
+    }
+
+    function renderLoanCards() {
+      const container = document.getElementById('loan-cards-container');
+      const totalAmountEl = document.getElementById('loan-total-amount');
+      const totalCountEl = document.getElementById('loan-total-count');
+      const badgeEl = document.getElementById('loan-badge');
+
+      if (!container) return;
+
+      const totalAmount = loansData.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      const count = loansData.length;
+
+      if (totalAmountEl) {
+        totalAmountEl.textContent = '฿' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      if (totalCountEl) {
+        totalCountEl.textContent = count > 0 ? `จำนวน ${count} คนค้างชำระ` : 'ไม่มีรายการค้างชำระ 🎉';
+      }
+
+      if (badgeEl) {
+        if (count > 0) {
+          badgeEl.textContent = count;
+          badgeEl.style.display = 'inline-block';
+        } else {
+          badgeEl.style.display = 'none';
+        }
+      }
+
+      if (loansData.length === 0) {
+        container.innerHTML = `
+          <div class="loan-empty-state">
+            <div style="font-size: 1.8rem; margin-bottom: 0.35rem;">🎉</div>
+            <b style="color: #34d399;">ไม่มีคนติดเงินแล้ว!</b>
+            <div style="font-size: 0.78rem; margin-top: 0.2rem;">หากมีคนมายืมเงิน บันทึกได้จากฟอร์มด้านล่าง</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      loansData.forEach((loan) => {
+        const formattedAmount = (Number(loan.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const shortDate = formatShortDate(loan.date);
+        
+        html += `
+          <div class="loan-card" id="card-${loan.id}">
+            <div class="loan-card-header">
+              <span class="loan-person-name">
+                <span>👤</span> ${escapeHtml(loan.person)}
+              </span>
+              <span class="loan-date-badge">ยืมเมื่อ ${shortDate}</span>
+            </div>
+
+            <div class="loan-card-body">
+              <span class="loan-card-note">${loan.note ? escapeHtml(loan.note) : '<span style="color:#64748b;">(ไม่ระบุโน้ต)</span>'}</span>
+              <span class="loan-card-amount">฿${formattedAmount}</span>
+            </div>
+
+            ${loan.history ? `<div class="loan-card-history">${escapeHtml(loan.history)}</div>` : ''}
+
+            <div class="loan-card-actions">
+              <button type="button" class="btn-loan-clear" onclick="clearLoanFull('${loan.id}')">
+                ✅ คืนครบ (เคลียร์)
+              </button>
+              <button type="button" class="btn-loan-partial" onclick="togglePartialRepayBox('${loan.id}')">
+                💵 คืนบางส่วน
+              </button>
+            </div>
+
+            <div class="loan-partial-box" id="partial-box-${loan.id}">
+              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.35rem;">ระบุจำนวนเงินที่มาคืน:</div>
+              <div class="loan-partial-row">
+                <input type="number" id="partial-input-${loan.id}" class="loan-partial-input" placeholder="จำนวนเงิน" step="1" inputmode="numeric" max="${loan.amount}">
+                <button type="button" class="btn-loan-repay-confirm" onclick="confirmPartialRepay('${loan.id}')">ตกลงคืน</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // ฟังก์ชันจัดการชิปชื่อคนยืมด่วน
+    function getStoredLoanPeople() {
+      try {
+        const raw = localStorage.getItem('capitalflow_loan_people');
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return ['ต้น', 'พี่เอก', 'บิ๊ก', 'นัท'];
+    }
+
+    function saveStoredLoanPeople(people) {
+      localStorage.setItem('capitalflow_loan_people', JSON.stringify(people));
+      renderPersonChips();
+    }
+
+    function renderPersonChips() {
+      const container = document.getElementById('loan-person-chips');
+      if (!container) return;
+      const people = getStoredLoanPeople();
+      if (people.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      let html = '';
+      people.forEach(p => {
+        html += `
+          <span class="person-chip" onclick="selectLoanPerson('${escapeHtml(p)}')">
+            👤 ${escapeHtml(p)}
+            <span class="remove-person" onclick="removeLoanPersonChip('${escapeHtml(p)}', event)" title="ลบชื่อนี้">×</span>
+          </span>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function selectLoanPerson(name) {
+      const input = document.getElementById('loan_person');
+      if (input) {
+        input.value = name;
+        const amountInput = document.getElementById('loan_amount');
+        if (amountInput) amountInput.focus();
+      }
+    }
+
+    function removeLoanPersonChip(name, event) {
+      if (event) event.stopPropagation();
+      let people = getStoredLoanPeople().filter(p => p !== name);
+      saveStoredLoanPeople(people);
+    }
+
+    // ฟังก์ชันจัดการปุ่มยอดเงินด่วน
+    function addLoanQuickAmount(amt) {
+      const input = document.getElementById('loan_amount');
+      if (!input) return;
+      const current = parseFloat(input.value) || 0;
+      input.value = current + amt;
+    }
+
+    function clearLoanAmount() {
+      const input = document.getElementById('loan_amount');
+      if (input) input.value = '';
+    }
+
+    // ฟังก์ชันบันทึกคนยืมใหม่
+    function submitLoanForm(e) {
+      e.preventDefault();
+      const date = document.getElementById('loan_date').value || getLocalDateString();
+      const person = document.getElementById('loan_person').value.trim();
+      const amount = parseFloat(document.getElementById('loan_amount').value) || 0;
+      const note = document.getElementById('loan_note').value.trim();
+
+      if (!person) {
+        alert('กรุณากรอกชื่อคนยืม');
+        return;
+      }
+      if (amount <= 0) {
+        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+        return;
+      }
+
+      // บันทึกชื่อคนนี้ลงใน People Chips ถ้ายังไม่มี
+      let people = getStoredLoanPeople();
+      if (!people.includes(person)) {
+        people.unshift(person);
+        if (people.length > 10) people = people.slice(0, 10);
+        saveStoredLoanPeople(people);
+      }
+
+      // ตรวจสอบว่าคนนี้มีหนี้ค้างอยู่แล้วหรือไม่
+      const existingIdx = loansData.findIndex(l => l.person.toLowerCase() === person.toLowerCase());
+      const nowStr = getBangkokNowString();
+      const shortDate = formatShortDate(date);
+
+      if (existingIdx !== -1) {
+        // รวมยอดเข้าการ์ดเดิม
+        loansData[existingIdx].amount = (Number(loansData[existingIdx].amount) || 0) + amount;
+        loansData[existingIdx].updatedAt = nowStr;
+        const addHistory = `ยืมเพิ่ม ${amount.toLocaleString()} (${shortDate})`;
+        loansData[existingIdx].history = loansData[existingIdx].history ? `${loansData[existingIdx].history} | ${addHistory}` : addHistory;
+        if (note) {
+          loansData[existingIdx].note = loansData[existingIdx].note ? `${loansData[existingIdx].note}, ${note}` : note;
+        }
+      } else {
+        // เพิ่มคนใหม่
+        loansData.unshift({
+          id: 'loan_' + Date.now(),
+          date: date,
+          person: person,
+          amount: amount,
+          note: note,
+          updatedAt: nowStr,
+          history: `ยืม ${amount.toLocaleString()} (${shortDate})`
+        });
+      }
+
+      saveLoansData();
+      syncLoansToGAS();
+
+      // เคลียร์ฟอร์ม
+      document.getElementById('loan_amount').value = '';
+      document.getElementById('loan_note').value = '';
+      updateDateDefaults(true);
+
+      // เลื่อนจอขึ้นไปดูการ์ด
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ฟังก์ชันคืนครบ (เคลียร์ออก)
+    function clearLoanFull(id) {
+      const idx = loansData.findIndex(l => l.id === id);
+      if (idx === -1) return;
+
+      const clearedItem = loansData[idx];
+      lastClearedLoan = { ...clearedItem, originalIndex: idx };
+      loansData.splice(idx, 1);
+      saveLoansData();
+      syncLoansToGAS();
+
+      // แสดง Undo Toast 8 วินาที
+      showUndoToast(`เคลียร์หนี้ ${clearedItem.person} (฿${Number(clearedItem.amount).toLocaleString()}) เรียบร้อย`);
+    }
+
+    function showUndoToast(msg) {
+      const toast = document.getElementById('loan-undo-toast');
+      const text = document.getElementById('loan-undo-text');
+      if (!toast || !text) return;
+
+      text.textContent = msg;
+      toast.style.display = 'flex';
+
+      if (undoTimer) clearTimeout(undoTimer);
+      undoTimer = setTimeout(() => {
+        toast.style.display = 'none';
+        lastClearedLoan = null;
+      }, 8000);
+    }
+
+    function undoLastClear() {
+      if (!lastClearedLoan) return;
+      if (undoTimer) clearTimeout(undoTimer);
+      document.getElementById('loan-undo-toast').style.display = 'none';
+
+      // คืนค่ากลับเข้า loansData
+      loansData.splice(lastClearedLoan.originalIndex || 0, 0, lastClearedLoan);
+      lastClearedLoan = null;
+      saveLoansData();
+      syncLoansToGAS();
+    }
+
+    // ฟังก์ชันคืนบางส่วน
+    function togglePartialRepayBox(id) {
+      const box = document.getElementById(`partial-box-${id}`);
+      if (!box) return;
+      box.classList.toggle('active');
+      if (box.classList.contains('active')) {
+        const input = document.getElementById(`partial-input-${id}`);
+        if (input) input.focus();
+      }
+    }
+
+    function confirmPartialRepay(id) {
+      const idx = loansData.findIndex(l => l.id === id);
+      if (idx === -1) return;
+
+      const input = document.getElementById(`partial-input-${id}`);
+      const repayAmt = parseFloat(input.value) || 0;
+
+      if (repayAmt <= 0) {
+        alert('กรุณาระบุจำนวนเงินที่มาคืนให้ถูกต้อง');
+        return;
+      }
+
+      const currentAmt = Number(loansData[idx].amount) || 0;
+      if (repayAmt >= currentAmt) {
+        // คืนหมดหรือเกิน -> เคลียร์ครบ
+        clearLoanFull(id);
+      } else {
+        // หักลบยอด
+        loansData[idx].amount = currentAmt - repayAmt;
+        loansData[idx].updatedAt = getBangkokNowString();
+        const shortDate = formatShortDate(getLocalDateString());
+        const repHistory = `คืนแล้ว ${repayAmt.toLocaleString()} (${shortDate})`;
+        loansData[idx].history = loansData[idx].history ? `${loansData[idx].history} | ${repHistory}` : repHistory;
+
+        saveLoansData();
+        syncLoansToGAS();
+      }
+    }
+
+    // ซิงค์รายการยืม-คืนกับ Google Sheet
+    function syncLoansToGAS() {
+      if (!GAS_URL) return;
+      setGlobalSyncStatus('loading', 'กำลังซิงค์รายการยืม-คืน...');
+
+      fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          type: 'loan_sync',
+          loans: loansData
+        })
+      })
+      .then(res => res.json())
+      .then(resData => {
+        setGlobalSyncStatus('idle', 'พร้อมใช้งาน (ซิงค์ Google Sheet แล้ว)');
+      })
+      .catch(err => {
+        // Background sync error does not disturb user
+        setGlobalSyncStatus('idle', 'พร้อมใช้งาน (ข้อมูลในเครื่องอัปเดตแล้ว)');
+      });
+    }
+
+    function fetchLoansFromGAS() {
+      if (!GAS_URL) return;
+      fetch(GAS_URL + '?action=get_loans', { method: 'GET', mode: 'cors' })
+        .then(res => res.json())
+        .then(resData => {
+          if (resData && resData.status === 'success' && Array.isArray(resData.loans)) {
+            // ซิงค์เฉพาะเมื่อฝั่งเซิร์ฟเวอร์มีข้อมูล หรือฝั่งเครื่องไม่มีข้อมูล
+            if (loansData.length === 0 && resData.loans.length > 0) {
+              loansData = resData.loans;
+              saveLoansData();
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
     // เคลียร์ค้างส่งเก่าออกจากเครื่องเพื่อตัดโอกาสเบิ้ลรายการ 100%
     try {
       localStorage.removeItem('capitalflow_pending_queue');
@@ -1312,6 +2081,8 @@
     prewarmGAS();
     setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
     loadCachedAomAm();
+    loadCachedLoans();
+    fetchLoansFromGAS();
   </script>
 </body>
 </html>
