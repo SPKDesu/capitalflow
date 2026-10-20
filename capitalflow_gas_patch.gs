@@ -25,7 +25,7 @@ function doPost(e) {
       var sheet = ss.getSheetByName('Installments');
       if (!sheet) {
         sheet = ss.insertSheet('Installments');
-        sheet.appendRow(['Date', 'Item Name', 'Source', 'Total Amount', 'Months', 'Interest Rate', 'Start Month', 'End Month', 'Monthly Amount', 'Status', 'Synced']);
+        sheet.appendRow(['Date', 'Item Name', 'Source', 'Total Amount', 'Months', 'Interest Rate', 'Start Month', 'End Month', 'Monthly Amount', 'Status']);
       }
       
       sheet.appendRow([
@@ -38,8 +38,7 @@ function doPost(e) {
         data.start_month,
         data.end_month,
         data.monthly_amount,
-        'Active',
-        'Pending' // Synced column
+        'Active'
       ]);
       
       return ContentService.createTextOutput("SUCCESS");
@@ -76,11 +75,16 @@ function doGet(e) {
     return handleGetLoans();
   }
 
-  // ซิงค์รายการผ่อนชำระเข้าคอม
+  // ซิงค์รายการผ่อนชำระเข้าคอม (Installments)
   if (action === 'sync_installments') {
     var sheet = ss.getSheetByName('Installments');
     if (!sheet) return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
     
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+    }
+
     var data = sheet.getDataRange().getValues();
     var pending = [];
     
@@ -102,18 +106,19 @@ function doGet(e) {
         });
       }
     }
+
+    // ลบข้อมูลแถวที่ซิงค์แล้วออกจากชีต Installments ทันที (คงแถวหัวตารางแถว 1 ไว้)
+    sheet.deleteRows(2, lastRow - 1);
     return ContentService.createTextOutput(JSON.stringify(pending)).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ยืนยันการซิงค์รายการผ่อนชำระ
+  // ยืนยันการซิงค์รายการผ่อนชำระ (เคลียร์แถวที่ค้างหากมี)
   if (action === 'confirm_sync_installments') {
     var sheet = ss.getSheetByName('Installments');
     if (sheet) {
-      var data = sheet.getDataRange().getValues();
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][10] !== 'Synced') {
-          sheet.getRange(i + 1, 11).setValue('Synced');
-        }
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        sheet.deleteRows(2, lastRow - 1);
       }
     }
     return ContentService.createTextOutput("CONFIRMED");
