@@ -984,42 +984,35 @@
     </div>
   </div>
 
-  <!-- Edit Loan Modal -->
+  <!-- Edit Loan Modal (Multi-item per Person) -->
   <div id="loanEditModal" class="modal">
-    <div class="modal-content" style="text-align: left; max-width: 360px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h2 style="font-size: 1.2rem; margin: 0; background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✏️ แก้ไขรายการยืม</h2>
+    <div class="modal-content" style="text-align: left; max-width: 390px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-shrink: 0;">
+        <h2 id="edit_modal_title" style="font-size: 1.15rem; margin: 0; background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          ✏️ แก้ไขรายการยืม
+        </h2>
         <span onclick="closeEditLoanModal()" style="font-size: 1.3rem; color: #94a3b8; cursor: pointer; padding: 0 4px; line-height: 1;">✕</span>
       </div>
 
       <input type="hidden" id="edit_loan_id">
 
-      <div class="form-group">
-        <label>วันที่ยืม (Date)</label>
-        <input type="date" id="edit_loan_date" required>
+      <!-- Scrollable container for individual items -->
+      <div id="edit_items_container" style="overflow-y: auto; max-height: 52vh; padding-right: 4px; display: flex; flex-direction: column; gap: 0.65rem;">
+        <!-- Filled dynamically by renderEditItemRows -->
       </div>
 
-      <div class="form-group">
-        <label>ชื่อคนยืม (Name)</label>
-        <input type="text" id="edit_loan_person" required autocomplete="off">
+      <div style="margin-top: 0.65rem; flex-shrink: 0;">
+        <button type="button" onclick="addEditItemRow()" style="width: 100%; padding: 0.5rem; border-radius: 10px; border: 1px dashed rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1); color: #fbbf24; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;">
+          ➕ เพิ่มยอดยืมอีกรายการ
+        </button>
       </div>
 
-      <div class="form-group">
-        <label>ยอดเงินคงค้าง (Amount)</label>
-        <input type="number" id="edit_loan_amount" step="1" inputmode="numeric" required>
-      </div>
-
-      <div class="form-group">
-        <label>หมายเหตุ (Note)</label>
-        <input type="text" id="edit_loan_note" autocomplete="off">
-      </div>
-
-      <div style="display: flex; gap: 0.5rem; margin-top: 1.2rem;">
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.85rem; flex-shrink: 0;">
         <button type="button" onclick="closeEditLoanModal()" style="flex: 1; padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border); background: rgba(15,23,42,0.6); color: var(--text-muted); font-weight: 500; cursor: pointer;">
           ยกเลิก
         </button>
         <button type="button" onclick="saveEditedLoan()" class="close-btn" style="flex: 1.5; padding: 0.75rem; background: linear-gradient(135deg, #f59e0b, #d97706);">
-          💾 บันทึก
+          💾 บันทึกทั้งหมด
         </button>
       </div>
     </div>
@@ -1765,6 +1758,53 @@
       return `${d} ${thaiMonths[mIdx] || parts[1]}`;
     }
 
+    function ensureLoanItems(loan) {
+      if (!loan.items || !Array.isArray(loan.items) || loan.items.length === 0) {
+        loan.items = [
+          {
+            id: 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            date: loan.date || getLocalDateString(),
+            amount: Number(loan.amount) || 0,
+            note: loan.note || ''
+          }
+        ];
+      }
+    }
+
+    function consolidateLoansByPerson() {
+      // รวมการ์ดตามชื่อคน (1 คน = 1 การ์ดเสมอ) โดยเก็บแต่ละยอดยืมไว้ใน items
+      const grouped = {};
+      const order = [];
+
+      loansData.forEach(loan => {
+        ensureLoanItems(loan);
+        const key = (loan.person || '').trim().toLowerCase();
+        if (!key) return;
+
+        if (!grouped[key]) {
+          grouped[key] = {
+            id: loan.id,
+            person: (loan.person || '').trim(),
+            amount: 0,
+            items: [],
+            history: loan.history || '',
+            updatedAt: loan.updatedAt || getBangkokNowString()
+          };
+          order.push(key);
+        }
+
+        loan.items.forEach(it => {
+          grouped[key].items.push({ ...it });
+        });
+        grouped[key].amount += Number(loan.amount) || 0;
+        if (loan.history && !grouped[key].history.includes(loan.history)) {
+          grouped[key].history = grouped[key].history ? `${grouped[key].history} | ${loan.history}` : loan.history;
+        }
+      });
+
+      loansData = order.map(k => grouped[k]);
+    }
+
     function loadCachedLoans() {
       try {
         const raw = localStorage.getItem('capitalflow_loans_data');
@@ -1776,6 +1816,7 @@
       } catch (e) {
         loansData = [];
       }
+      consolidateLoansByPerson();
       renderLoanCards();
       renderPersonChips();
     }
@@ -1826,27 +1867,51 @@
 
       let html = '';
       loansData.forEach((loan) => {
+        ensureLoanItems(loan);
         const formattedAmount = (Number(loan.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const shortDate = formatShortDate(loan.date);
         
+        // หาวันที่ยืมล่าสุดสำหรับแสดงบน Badge
+        const latestDate = loan.items.reduce((max, it) => (!max || it.date > max ? it.date : max), loan.date || '');
+        const shortDate = formatShortDate(latestDate);
+
+        // แสดงรายการย่อยแต่ละยอด
+        let itemsHtml = '';
+        if (loan.items && loan.items.length > 0) {
+          itemsHtml += '<div style="margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px dashed rgba(255, 255, 255, 0.08); font-size: 0.75rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 4px;">';
+          loan.items.forEach((it, i) => {
+            const itDate = formatShortDate(it.date);
+            const itAmt = (Number(it.amount) || 0).toLocaleString();
+            const itNote = it.note ? ` (${escapeHtml(it.note)})` : '';
+            itemsHtml += `
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #94a3b8;">• ยอดที่ ${i + 1}: ${itDate}${itNote}</span>
+                <span style="font-weight: 600; color: #f59e0b;">฿${itAmt}</span>
+              </div>
+            `;
+          });
+          itemsHtml += '</div>';
+        }
+
         html += `
           <div class="loan-card" id="card-${loan.id}">
             <div class="loan-card-header">
               <span class="loan-person-name">
                 <span>👤</span> ${escapeHtml(loan.person)}
-                <span class="btn-edit-icon" onclick="openEditLoanModal('${loan.id}')" title="แก้ไขรายการ">✏️</span>
+                <span class="btn-edit-icon" onclick="openEditLoanModal('${loan.id}')" title="แก้ไขแต่ละยอด">✏️ แก้ไข</span>
               </span>
-              <span class="loan-date-badge">ยืมเมื่อ ${shortDate}</span>
+              <span class="loan-date-badge">${loan.items.length > 1 ? `${loan.items.length} ยอด (ล่าสุด ${shortDate})` : `ยืมเมื่อ ${shortDate}`}</span>
             </div>
 
-            <div class="loan-card-body">
-              <span class="loan-card-note">${loan.note ? escapeHtml(loan.note) : '<span style="color:#64748b;">(ไม่ระบุโน้ต)</span>'}</span>
+            <div class="loan-card-body" style="margin-bottom: 0.2rem;">
+              <span class="loan-card-note">${loan.items.length > 1 ? '<span style="color:#94a3b8;">ยอดคงค้างรวม</span>' : (loan.note ? escapeHtml(loan.note) : '<span style="color:#64748b;">(ไม่ระบุโน้ต)</span>')}</span>
               <span class="loan-card-amount">฿${formattedAmount}</span>
             </div>
 
-            ${loan.history ? `<div class="loan-card-history">${escapeHtml(loan.history)}</div>` : ''}
+            ${itemsHtml}
 
-            <div class="loan-card-actions">
+            ${loan.history ? `<div class="loan-card-history" style="margin-top: 0.45rem;">${escapeHtml(loan.history)}</div>` : ''}
+
+            <div class="loan-card-actions" style="margin-top: 0.65rem;">
               <button type="button" class="btn-loan-clear" onclick="clearLoanFull('${loan.id}')">
                 ✅ คืนครบ (เคลียร์)
               </button>
@@ -1974,19 +2039,34 @@
         saveStoredLoanPeople(people);
       }
 
-      // เพิ่มรายการใหม่แยกเป็นแต่ละยอด (ไม่รวมยอดอัตโนมัติ เพื่อให้แยกตามวันที่และจำนวนเงินของแต่ละครั้งได้ชัดเจน)
+      // ตรวจสอบว่าคนนี้มีหนี้ค้างอยู่แล้วหรือไม่ (1 คน = 1 การ์ดเสมอ)
+      const existingIdx = loansData.findIndex(l => l.person.toLowerCase() === person.toLowerCase());
       const nowStr = getBangkokNowString();
-      const shortDate = formatShortDate(date);
 
-      loansData.unshift({
-        id: 'loan_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      const newItem = {
+        id: 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
         date: date,
-        person: person,
         amount: amount,
-        note: note,
-        updatedAt: nowStr,
-        history: `ยืม ${amount.toLocaleString()} (${shortDate})`
-      });
+        note: note
+      };
+
+      if (existingIdx !== -1) {
+        // เพิ่มยอดย่อยเข้าการ์ดเดิมของคนนี้
+        ensureLoanItems(loansData[existingIdx]);
+        loansData[existingIdx].items.push(newItem);
+        loansData[existingIdx].amount = (Number(loansData[existingIdx].amount) || 0) + amount;
+        loansData[existingIdx].updatedAt = nowStr;
+      } else {
+        // สร้างการ์ดใหม่สำหรับคนนี้
+        loansData.unshift({
+          id: 'loan_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          person: person,
+          amount: amount,
+          items: [newItem],
+          history: '',
+          updatedAt: nowStr
+        });
+      }
 
       saveLoansData();
       syncLoansToGAS();
@@ -2086,18 +2166,83 @@
       }
     }
 
-    // ฟังก์ชันเปิด-ปิดและบันทึกแก้ไขรายการยืม
+    // ฟังก์ชันเปิด-ปิดและบันทึกแก้ไขรายการยืม (แยกแต่ละยอด)
     function openEditLoanModal(id) {
       const loan = loansData.find(l => l.id === id);
       if (!loan) return;
+      ensureLoanItems(loan);
 
       document.getElementById('edit_loan_id').value = loan.id;
-      document.getElementById('edit_loan_date').value = loan.date || getLocalDateString();
-      document.getElementById('edit_loan_person').value = loan.person || '';
-      document.getElementById('edit_loan_amount').value = loan.amount || 0;
-      document.getElementById('edit_loan_note').value = loan.note || '';
-
+      document.getElementById('edit_modal_title').textContent = `✏️ แก้ไขรายการของ ${loan.person}`;
+      renderEditItemRows(loan);
       document.getElementById('loanEditModal').style.display = 'flex';
+    }
+
+    function renderEditItemRows(loan) {
+      const container = document.getElementById('edit_items_container');
+      container.innerHTML = '';
+
+      loan.items.forEach((it, idx) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'edit-item-card';
+        rowEl.id = `edit-item-${it.id}`;
+        rowEl.style.cssText = 'background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.75rem; position: relative;';
+
+        rowEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <span style="font-size: 0.78rem; font-weight: 600; color: #fbbf24;">ยอดที่ ${idx + 1}</span>
+            <span onclick="this.closest('.edit-item-card').remove()" style="color: #f87171; font-size: 0.75rem; cursor: pointer; padding: 2px 5px;" title="ลบยอดนี้">🗑️ ลบยอดนี้</span>
+          </div>
+          <div style="display: flex; gap: 0.4rem; margin-bottom: 0.4rem;">
+            <div style="flex: 1.1;">
+              <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">วันที่ยืม</label>
+              <input type="date" class="edit-item-date" value="${it.date || ''}" style="padding: 0.4rem 0.5rem; font-size: 0.8rem; height: 36px;" required>
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">จำนวนเงิน (บาท)</label>
+              <input type="number" class="edit-item-amount" value="${it.amount || 0}" step="1" inputmode="numeric" style="padding: 0.4rem 0.5rem; font-size: 0.85rem; height: 36px; font-weight: 600; color: #f59e0b;" required>
+            </div>
+          </div>
+          <div>
+            <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">หมายเหตุ</label>
+            <input type="text" class="edit-item-note" value="${escapeHtml(it.note || '')}" placeholder="เช่น ค่าข้าว, โอนสำรอง" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; height: 34px;">
+          </div>
+        `;
+        container.appendChild(rowEl);
+      });
+    }
+
+    function addEditItemRow() {
+      const container = document.getElementById('edit_items_container');
+      const count = container.querySelectorAll('.edit-item-card').length;
+      const rowEl = document.createElement('div');
+      rowEl.className = 'edit-item-card';
+      rowEl.style.cssText = 'background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 12px; padding: 0.65rem 0.75rem; position: relative;';
+
+      const newId = 'sub_new_' + Date.now();
+      rowEl.id = `edit-item-${newId}`;
+      rowEl.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+          <span style="font-size: 0.78rem; font-weight: 600; color: #fbbf24;">ยอดที่ ${count + 1}</span>
+          <span onclick="this.closest('.edit-item-card').remove()" style="color: #f87171; font-size: 0.75rem; cursor: pointer; padding: 2px 5px;" title="ลบยอดนี้">🗑️ ลบยอดนี้</span>
+        </div>
+        <div style="display: flex; gap: 0.4rem; margin-bottom: 0.4rem;">
+          <div style="flex: 1.1;">
+            <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">วันที่ยืม</label>
+            <input type="date" class="edit-item-date" value="${getLocalDateString()}" style="padding: 0.4rem 0.5rem; font-size: 0.8rem; height: 36px;" required>
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">จำนวนเงิน (บาท)</label>
+            <input type="number" class="edit-item-amount" placeholder="0" step="1" inputmode="numeric" style="padding: 0.4rem 0.5rem; font-size: 0.85rem; height: 36px; font-weight: 600; color: #f59e0b;" required>
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.7rem; color: #94a3b8; display: block; margin-bottom: 2px;">หมายเหตุ</label>
+          <input type="text" class="edit-item-note" placeholder="เช่น ค่าข้าว, โอนสำรอง" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; height: 34px;">
+        </div>
+      `;
+      container.appendChild(rowEl);
+      rowEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
 
     function closeEditLoanModal() {
@@ -2110,24 +2255,48 @@
       const idx = loansData.findIndex(l => l.id === id);
       if (idx === -1) return;
 
-      const date = document.getElementById('edit_loan_date').value;
-      const person = document.getElementById('edit_loan_person').value.trim();
-      const amount = parseFloat(document.getElementById('edit_loan_amount').value) || 0;
-      const note = document.getElementById('edit_loan_note').value.trim();
+      const dateInputs = document.querySelectorAll('#edit_items_container .edit-item-date');
+      const amtInputs = document.querySelectorAll('#edit_items_container .edit-item-amount');
+      const noteInputs = document.querySelectorAll('#edit_items_container .edit-item-note');
 
-      if (!person) {
-        alert('กรุณากรอกชื่อคนยืม');
+      const newItems = [];
+      let newTotalBorrow = 0;
+
+      for (let i = 0; i < dateInputs.length; i++) {
+        const d = dateInputs[i].value;
+        const a = parseFloat(amtInputs[i].value) || 0;
+        const n = noteInputs[i].value.trim();
+
+        if (a <= 0) {
+          alert(`กรุณาระบุจำนวนเงินของยอดที่ ${i + 1} ให้มากกว่า 0`);
+          return;
+        }
+
+        newItems.push({
+          id: 'sub_' + i + '_' + Date.now(),
+          date: d,
+          amount: a,
+          note: n
+        });
+        newTotalBorrow += a;
+      }
+
+      if (newItems.length === 0) {
+        // ลบทุกยอดออกหมด -> เคลียร์การ์ดนี้ทิ้ง
+        clearLoanFull(id);
+        closeEditLoanModal();
         return;
       }
-      if (amount <= 0) {
-        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
-        return;
-      }
 
-      loansData[idx].date = date;
-      loansData[idx].person = person;
-      loansData[idx].amount = amount;
-      loansData[idx].note = note;
+      // คำนวณยอดที่เคยคืนไปแล้ว (ถ้ามี) เพื่อหายอดคงค้างสุทธิ
+      ensureLoanItems(loansData[idx]);
+      const oldTotalBorrow = loansData[idx].items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+      const totalRepaidSoFar = Math.max(0, oldTotalBorrow - (Number(loansData[idx].amount) || 0));
+
+      const newBalance = Math.max(0, newTotalBorrow - totalRepaidSoFar);
+
+      loansData[idx].items = newItems;
+      loansData[idx].amount = newBalance;
       loansData[idx].updatedAt = getBangkokNowString();
 
       saveLoansData();
