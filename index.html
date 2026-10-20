@@ -1801,11 +1801,19 @@
             </div>
 
             <div class="loan-partial-box" id="partial-box-${loan.id}">
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-bottom: 0.35rem;">ระบุจำนวนเงินที่มาคืน:</div>
-              <div class="loan-partial-row">
-                <input type="number" id="partial-input-${loan.id}" class="loan-partial-input" placeholder="จำนวนเงิน" step="1" inputmode="numeric" max="${loan.amount}">
-                <button type="button" class="btn-loan-repay-confirm" onclick="confirmPartialRepay('${loan.id}')">ตกลงคืน</button>
+              <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="flex: 1.1;">
+                  <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 3px;">วันที่คืนเงิน</label>
+                  <input type="date" id="partial-date-${loan.id}" value="${getLocalDateString()}" style="padding: 0.45rem 0.5rem; font-size: 0.82rem; height: 38px;">
+                </div>
+                <div style="flex: 1;">
+                  <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 3px;">ยอดที่คืน (บาท)</label>
+                  <input type="number" id="partial-input-${loan.id}" class="loan-partial-input" placeholder="0.00" step="1" inputmode="numeric" max="${loan.amount}">
+                </div>
               </div>
+              <button type="button" class="btn-loan-repay-confirm" style="width: 100%; height: 38px;" onclick="confirmPartialRepay('${loan.id}')">
+                💵 ยืนยันการคืนเงิน
+              </button>
             </div>
           </div>
         `;
@@ -2008,7 +2016,10 @@
       if (idx === -1) return;
 
       const input = document.getElementById(`partial-input-${id}`);
+      const dateInput = document.getElementById(`partial-date-${id}`);
       const repayAmt = parseFloat(input.value) || 0;
+      const repayDate = (dateInput && dateInput.value) ? dateInput.value : getLocalDateString();
+      const shortDate = formatShortDate(repayDate);
 
       if (repayAmt <= 0) {
         alert('กรุณาระบุจำนวนเงินที่มาคืนให้ถูกต้อง');
@@ -2017,13 +2028,14 @@
 
       const currentAmt = Number(loansData[idx].amount) || 0;
       if (repayAmt >= currentAmt) {
-        // คืนหมดหรือเกิน -> เคลียร์ครบ
+        // คืนหมดหรือเกิน -> เคลียร์ครบ (พร้อมบันทึกประวัติวันที่คืนครบ)
+        const repHistory = `คืนครบ ${currentAmt.toLocaleString()} (${shortDate})`;
+        loansData[idx].history = loansData[idx].history ? `${loansData[idx].history} | ${repHistory}` : repHistory;
         clearLoanFull(id);
       } else {
         // หักลบยอด
         loansData[idx].amount = currentAmt - repayAmt;
         loansData[idx].updatedAt = getBangkokNowString();
-        const shortDate = formatShortDate(getLocalDateString());
         const repHistory = `คืนแล้ว ${repayAmt.toLocaleString()} (${shortDate})`;
         loansData[idx].history = loansData[idx].history ? `${loansData[idx].history} | ${repHistory}` : repHistory;
 
