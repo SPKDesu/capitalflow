@@ -1758,7 +1758,58 @@
       return `${d} ${thaiMonths[mIdx] || parts[1]}`;
     }
 
+    function parseThaiShortDateToISO(shortDate, fallbackYear) {
+      if (!shortDate) return '';
+      const parts = shortDate.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const d = String(parts[0]).padStart(2, '0');
+        const thaiMonthMap = {
+          'ม.ค.': '01', 'ก.พ.': '02', 'มี.ค.': '03', 'เม.ย.': '04',
+          'พ.ค.': '05', 'มิ.ย.': '06', 'ก.ค.': '07', 'ส.ค.': '08',
+          'ก.ย.': '09', 'ต.ค.': '10', 'พ.ย.': '11', 'ธ.ค.': '12'
+        };
+        const m = thaiMonthMap[parts[1]] || '01';
+        const y = fallbackYear || (new Date().getFullYear());
+        return `${y}-${m}-${d}`;
+      }
+      return '';
+    }
+
     function ensureLoanItems(loan) {
+      // หากมีรายการย่อยมากกว่า 1 อยู่แล้ว ไม่ต้องทำอะไร
+      if (loan.items && Array.isArray(loan.items) && loan.items.length > 1) {
+        return;
+      }
+
+      // ตรวจสอบประวัติเก่า หากเคยเกิดจากการรวมยอดในเวอร์ชันแรก (มีคำว่า 'ยืมเพิ่ม') ให้แตกกลับเป็นรายการย่อยแต่ละยอดอัตโนมัติ
+      if (loan.history && /ยืมเพิ่ม/i.test(loan.history)) {
+        const regex = /(?:ยืม(?:เพิ่ม)?)\s+([\d,]+(?:\.\d+)?)\s*\(([^)]+)\)/g;
+        let match;
+        const parsedItems = [];
+        const fallbackYear = loan.date ? loan.date.substring(0, 4) : (new Date().getFullYear());
+        const notes = (loan.note || '').split(',').map(s => s.trim());
+        let nIdx = 0;
+
+        while ((match = regex.exec(loan.history)) !== null) {
+          const amt = parseFloat(match[1].replace(/,/g, '')) || 0;
+          const parsedDate = parseThaiShortDateToISO(match[2], fallbackYear) || loan.date || getLocalDateString();
+          if (amt > 0) {
+            parsedItems.push({
+              id: 'sub_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+              date: parsedDate,
+              amount: amt,
+              note: notes[nIdx] || ''
+            });
+            nIdx++;
+          }
+        }
+
+        if (parsedItems.length > 1) {
+          loan.items = parsedItems;
+          return;
+        }
+      }
+
       if (!loan.items || !Array.isArray(loan.items) || loan.items.length === 0) {
         loan.items = [
           {
