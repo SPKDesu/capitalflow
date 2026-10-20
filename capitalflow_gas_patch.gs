@@ -53,8 +53,7 @@ function doPost(e) {
       data.category,
       data.frequency,
       data.item,
-      data.amount,
-      'Pending'
+      data.amount
     ]);
     return ContentService.createTextOutput("SUCCESS");
 
@@ -123,22 +122,27 @@ function doGet(e) {
   // ซิงค์รายจ่ายด่วนเข้าคอม (Expenses)
   if (action === 'sync') {
     var sheet = ss.getSheetByName('Expenses') || ss.getSheets()[0];
-    var data = sheet.getDataRange().getValues();
-    var pending = [];
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][6] !== 'Synced') {
-        pending.push({
-          date: data[i][0],
-          type: data[i][1],
-          category: data[i][2],
-          frequency: data[i][3],
-          item: data[i][4],
-          amount: data[i][5]
-        });
-        sheet.getRange(i + 1, 7).setValue('Synced');
-      }
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
     }
-    return ContentService.createTextOutput(JSON.stringify(pending)).setMimeType(ContentService.MimeType.JSON);
+    
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, 6);
+    var values = dataRange.getValues();
+    var jsonData = values.map(function(row) {
+      return {
+        date: row[0],
+        type: row[1],
+        category: row[2],
+        frequency: row[3],
+        item: row[4],
+        amount: row[5]
+      };
+    });
+    
+    // ลบข้อมูลแถวที่ซิงค์แล้วออกจาก Sheets (คงแถวหัวตารางแถว 1 ไว้) ตาม Flow เดิม
+    sheet.deleteRows(2, lastRow - 1);
+    return ContentService.createTextOutput(JSON.stringify(jsonData)).setMimeType(ContentService.MimeType.JSON);
   }
 
   return ContentService.createTextOutput("CapitalFlow Web App is running.");
