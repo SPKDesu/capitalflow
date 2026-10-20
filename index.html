@@ -921,7 +921,9 @@
       <!-- รายการคนค้างชำระ -->
       <div style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
         <span>👥 คนค้างชำระ</span>
-        <span style="font-size: 0.72rem; color: #94a3b8; font-weight: 400;">กดเคลียร์เพื่อลบออกทันที</span>
+        <button type="button" onclick="fetchLoansFromGAS(true)" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #93c5fd; font-size: 0.72rem; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-weight: 500;">
+          <span>🔄</span> รีเฟรชยอด
+        </button>
       </div>
       <div id="loan-cards-container" class="loan-cards-list">
         <!-- Filled by JS -->
@@ -1076,7 +1078,7 @@
       }
       const loanTab = document.getElementById('loan-tab-content');
       if (loanTab && loanTab.classList.contains('active')) {
-        fetchLoansFromGAS();
+        fetchLoansFromGAS(true);
       }
     }
 
@@ -1139,11 +1141,19 @@
       if (document.visibilityState === 'visible') {
         updateDateDefaults(false);
         prewarmGAS();
+        const loanTab = document.getElementById('loan-tab-content');
+        if (loanTab && loanTab.classList.contains('active')) {
+          fetchLoansFromGAS();
+        }
       }
     });
     window.addEventListener('focus', function() {
       updateDateDefaults(false);
       prewarmGAS();
+      const loanTab = document.getElementById('loan-tab-content');
+      if (loanTab && loanTab.classList.contains('active')) {
+        fetchLoansFromGAS();
+      }
     });
 
     // ==========================================
@@ -1776,12 +1786,26 @@
     }
 
     function ensureLoanItems(loan) {
-      // หากมีรายการย่อยมากกว่า 1 อยู่แล้ว ไม่ต้องทำอะไร
-      if (loan.items && Array.isArray(loan.items) && loan.items.length > 1) {
+      // หากมีรายการย่อยมากกว่า 0 อยู่แล้ว และไม่ใช่ array ว่าง
+      if (loan.items && Array.isArray(loan.items) && loan.items.length > 0) {
         return;
       }
 
-      // ตรวจสอบประวัติเก่า หากเคยเกิดจากการรวมยอดในเวอร์ชันแรก (มีคำว่า 'ยืมเพิ่ม') ให้แตกกลับเป็นรายการย่อยแต่ละยอดอัตโนมัติ
+      // 1. ตรวจสอบว่ามี <!--ITEMS:...--> ฝังอยู่ใน history หรือไม่ (กู้คืนรายการย่อยจาก Cloud)
+      if (loan.history && loan.history.includes('<!--ITEMS:')) {
+        const match = loan.history.match(/<!--ITEMS:(.*?)-->/i);
+        if (match) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(match[1]));
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              loan.items = parsed;
+              return;
+            }
+          } catch (e) {}
+        }
+      }
+
+      // 2. ตรวจสอบประวัติเก่า หากเคยเกิดจากการรวมยอดในเวอร์ชันแรก (มีคำว่า 'ยืมเพิ่ม') ให้แตกกลับเป็นรายการย่อยแต่ละยอดอัตโนมัติ
       if (loan.history && /ยืมเพิ่ม/i.test(loan.history)) {
         const regex = /(?:ยืม(?:เพิ่ม)?)\s+([\d,]+(?:\.\d+)?)\s*\(([^)]+)\)/g;
         let match;
@@ -1960,7 +1984,10 @@
 
             ${itemsHtml}
 
-            ${loan.history ? `<div class="loan-card-history" style="margin-top: 0.45rem;">${escapeHtml(loan.history)}</div>` : ''}
+            ${(() => {
+              const cleanHistory = (loan.history || '').replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
+              return cleanHistory ? `<div class="loan-card-history" style="margin-top: 0.45rem;">${escapeHtml(cleanHistory)}</div>` : '';
+            })()}
 
             <div class="loan-card-actions" style="margin-top: 0.65rem;">
               <button type="button" class="btn-loan-clear" onclick="clearLoanFull('${loan.id}')">
@@ -2348,6 +2375,13 @@
 
       loansData[idx].items = newItems;
       loansData[idx].amount = newBalance;
+      // อัปเดต วันที่ และ หมายเหตุ รวมของการ์ดให้สอดคล้องกับรายการย่อยที่เพิ่งแก้
+      const latestItem = newItems.reduce((max, it) => (!max || it.date > max.date ? it : max), newItems[0]);
+      if (latestItem) {
+        loansData[idx].date = latestItem.date;
+      }
+      const combinedNotes = newItems.map(it => it.note).filter(Boolean).join(', ');
+      loansData[idx].note = combinedNotes;
       loansData[idx].updatedAt = getBangkokNowString();
 
       saveLoansData();
@@ -2355,43 +2389,135 @@
       closeEditLoanModal();
     }
 
+    // รวมและเตรียมข้อมูลรายการยืม-คืนก่อนส่งขึ้น Google Sheet
+    function packLoansForGAS(loans) {
+      return loans.map(loan => {
+        ensureLoanItems(loan);
+        // ฝัง items ไว้ในรูปแบบ <!--ITEMS:...--> ต่อท้าย history
+        // ทำให้ Google Sheet ทั้งแบบ 6 คอลัมน์เดิม และ 7 คอลัมน์ใหม่ ซิงค์รายการย่อยข้ามเครื่องได้ 100%
+        const baseHistory = (loan.history || '').replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
+        const itemsTag = `<!--ITEMS:${encodeURIComponent(JSON.stringify(loan.items || []))}-->`;
+        const combinedHistory = baseHistory ? `${baseHistory} ${itemsTag}` : itemsTag;
+
+        return {
+          id: loan.id,
+          person: (loan.person || '').trim(),
+          amount: Number(loan.amount) || 0,
+          date: loan.date || (loan.items && loan.items[0] ? loan.items[0].date : getLocalDateString()),
+          note: loan.note || '',
+          history: combinedHistory,
+          items: loan.items || [],
+          updatedAt: loan.updatedAt || getBangkokNowString()
+        };
+      });
+    }
+
     // ซิงค์รายการยืม-คืนกับ Google Sheet
+    let isPushingLoans = false;
+    let hasPendingLoanSync = false;
+
     function syncLoansToGAS() {
       if (!GAS_URL) return;
+      isPushingLoans = true;
       setGlobalSyncStatus('loading', 'กำลังซิงค์รายการยืม-คืน...');
+
+      const payloadLoans = packLoansForGAS(loansData);
 
       fetch(GAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           type: 'loan_sync',
-          loans: loansData
+          loans: payloadLoans
         })
       })
       .then(res => res.json())
       .then(resData => {
+        isPushingLoans = false;
+        hasPendingLoanSync = false;
         setGlobalSyncStatus('idle', 'พร้อมใช้งาน (ซิงค์ Google Sheet แล้ว)');
       })
       .catch(err => {
-        // Background sync error does not disturb user
-        setGlobalSyncStatus('idle', 'พร้อมใช้งาน (ข้อมูลในเครื่องอัปเดตแล้ว)');
+        isPushingLoans = false;
+        hasPendingLoanSync = true;
+        setGlobalSyncStatus('idle', 'พร้อมใช้งาน (บันทึกในเครื่องแล้ว รอซิงค์)');
       });
     }
 
-    function fetchLoansFromGAS() {
+    function applyCloudLoans(cloudLoans, isManual = false) {
+      if (!Array.isArray(cloudLoans)) return;
+
+      // หากฝั่ง Cloud เป็นค่าว่าง (0 รายการ) แต่ในเครื่องมีข้อมูลอยู่
+      // ในการโหลดพื้นหลังอัตโนมัติ (ไม่ใช่การกดปุ่มรีเฟรชเอง) จะไม่ลบข้อมูลในเครื่องทิ้ง เพื่อความปลอดภัย
+      if (cloudLoans.length === 0 && loansData.length > 0 && !isManual) {
+        return;
+      }
+
+      const processedLoans = cloudLoans.map(loan => {
+        let items = Array.isArray(loan.items) ? loan.items : [];
+        let cleanHistory = (loan.history || '').trim();
+
+        // ตรวจสอบ <!--ITEMS:...--> ใน history
+        const match = cleanHistory.match(/<!--ITEMS:(.*?)-->/i);
+        if (match) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(match[1]));
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              items = parsed;
+            }
+          } catch (e) {}
+          cleanHistory = cleanHistory.replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
+        }
+
+        const normalized = {
+          id: loan.id || ('loan_' + Math.random().toString(36).substr(2, 6)),
+          person: (loan.person || '').trim(),
+          amount: Number(loan.amount) || 0,
+          date: loan.date || getLocalDateString(),
+          note: loan.note || '',
+          history: cleanHistory,
+          items: items,
+          updatedAt: loan.updatedAt || getBangkokNowString()
+        };
+        ensureLoanItems(normalized);
+        return normalized;
+      });
+
+      loansData = processedLoans;
+      consolidateLoansByPerson();
+      saveLoansData();
+      renderPersonChips();
+    }
+
+    function fetchLoansFromGAS(isManual = false) {
       if (!GAS_URL) return;
+      if (isPushingLoans) return;
+      if (hasPendingLoanSync) {
+        // หากมีรายการที่เครื่องนี้ยังส่งไม่สำเร็จ ให้พยายามส่งขึ้นก่อน
+        syncLoansToGAS();
+        return;
+      }
+
+      if (isManual) {
+        setGlobalSyncStatus('loading', 'กำลังดึงข้อมูลล่าสุดจาก Google Sheet...');
+      }
+
       fetch(GAS_URL + '?action=get_loans', { method: 'GET', mode: 'cors' })
         .then(res => res.json())
         .then(resData => {
           if (resData && resData.status === 'success' && Array.isArray(resData.loans)) {
-            // ซิงค์เฉพาะเมื่อฝั่งเซิร์ฟเวอร์มีข้อมูล หรือฝั่งเครื่องไม่มีข้อมูล
-            if (loansData.length === 0 && resData.loans.length > 0) {
-              loansData = resData.loans;
-              saveLoansData();
+            applyCloudLoans(resData.loans, isManual);
+            if (isManual) {
+              setGlobalSyncStatus('idle', 'ดึงข้อมูลล่าสุดสำเร็จ ✅');
+              setTimeout(() => setGlobalSyncStatus('idle', 'พร้อมใช้งาน (ซิงค์ Google Sheet แล้ว)'), 2500);
             }
           }
         })
-        .catch(() => {});
+        .catch(err => {
+          if (isManual) {
+            setGlobalSyncStatus('idle', 'ไม่สามารถเชื่อมต่อได้ (ใช้ข้อมูลในเครื่อง)');
+          }
+        });
     }
 
     // เคลียร์ค้างส่งเก่าออกจากเครื่องเพื่อตัดโอกาสเบิ้ลรายการ 100%

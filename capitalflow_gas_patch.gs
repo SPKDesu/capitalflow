@@ -155,8 +155,8 @@ function getOrCreateLoanSheet() {
   let sheet = ss.getSheetByName(LOAN_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(LOAN_SHEET_NAME);
-    const headers = [["วันที่ยืม", "ชื่อคนยืม", "ยอดคงค้าง (บาท)", "หมายเหตุ", "อัปเดตล่าสุด", "ประวัติการคืน/ยืม"]];
-    const headerRange = sheet.getRange(1, 1, 1, 6);
+    const headers = [["วันที่ยืม", "ชื่อคนยืม", "ยอดคงค้าง (บาท)", "หมายเหตุ", "อัปเดตล่าสุด", "ประวัติการคืน/ยืม", "รายการย่อย (JSON)"]];
+    const headerRange = sheet.getRange(1, 1, 1, 7);
     headerRange.setValues(headers);
     headerRange.setFontWeight("bold");
     headerRange.setBackground("#1e293b");
@@ -168,6 +168,13 @@ function getOrCreateLoanSheet() {
     sheet.setColumnWidth(4, 180);
     sheet.setColumnWidth(5, 150);
     sheet.setColumnWidth(6, 250);
+    sheet.setColumnWidth(7, 200);
+  } else {
+    // หากมีแท็บอยู่แล้ว แต่ยังไม่มีคอลัมน์ที่ 7 ให้เพิ่มหัวตารางคอลัมน์ 7
+    if (sheet.getLastColumn() < 7) {
+      sheet.getRange(1, 7).setValue("รายการย่อย (JSON)").setFontWeight("bold").setBackground("#1e293b").setFontColor("#f8fafc");
+      sheet.setColumnWidth(7, 200);
+    }
   }
   return sheet;
 }
@@ -179,11 +186,18 @@ function handleGetLoans() {
     const loans = [];
 
     if (lastRow > 1) {
-      const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      const numCols = Math.max(7, sheet.getLastColumn());
+      const data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
         const person = String(row[1] || "").trim();
         const amount = Number(row[2]) || 0;
+        let items = [];
+        if (row[6]) {
+          try {
+            items = JSON.parse(row[6]);
+          } catch (e) {}
+        }
         if (person && amount > 0) {
           loans.push({
             id: "loan_" + (i + 1) + "_" + Date.now(),
@@ -192,7 +206,8 @@ function handleGetLoans() {
             amount: amount,
             note: String(row[3] || ""),
             updatedAt: formatDateTime(row[4]),
-            history: String(row[5] || "")
+            history: String(row[5] || ""),
+            items: Array.isArray(items) ? items : []
           });
         }
       }
@@ -214,8 +229,9 @@ function handleSyncLoans(loansList) {
     const lastRow = sheet.getLastRow();
     
     // เคลียร์ข้อมูลเก่าทั้งหมด (คงแถวหัวตารางแถว 1 ไว้)
+    const numCols = Math.max(7, sheet.getLastColumn());
     if (lastRow > 1) {
-      sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
+      sheet.getRange(2, 1, lastRow - 1, numCols).clearContent();
     }
 
     if (Array.isArray(loansList) && loansList.length > 0) {
@@ -225,10 +241,11 @@ function handleSyncLoans(loansList) {
         Number(item.amount) || 0,
         item.note || "",
         item.updatedAt || new Date().toLocaleString("th-TH"),
-        item.history || ""
+        item.history || "",
+        JSON.stringify(item.items || [])
       ]);
 
-      const targetRange = sheet.getRange(2, 1, rows.length, 6);
+      const targetRange = sheet.getRange(2, 1, rows.length, 7);
       targetRange.setValues(rows);
       sheet.getRange(2, 3, rows.length, 1).setNumberFormat("#,##0.00");
     }
