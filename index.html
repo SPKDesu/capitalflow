@@ -715,7 +715,6 @@
       </button>
       <button type="button" class="tab-btn" id="tab-loan-btn" onclick="switchTab('loan')">
         🤝 <span class="tab-title">ยืม-คืน</span>
-        <span id="loan-badge" class="tab-badge" style="display:none;">0</span>
       </button>
     </div>
 
@@ -1903,7 +1902,6 @@
       const container = document.getElementById('loan-cards-container');
       const totalAmountEl = document.getElementById('loan-total-amount');
       const totalCountEl = document.getElementById('loan-total-count');
-      const badgeEl = document.getElementById('loan-badge');
 
       if (!container) return;
 
@@ -1916,15 +1914,6 @@
 
       if (totalCountEl) {
         totalCountEl.textContent = count > 0 ? `จำนวน ${count} คนค้างชำระ` : 'ไม่มีรายการค้างชำระ 🎉';
-      }
-
-      if (badgeEl) {
-        if (count > 0) {
-          badgeEl.textContent = count;
-          badgeEl.style.display = 'inline-block';
-        } else {
-          badgeEl.style.display = 'none';
-        }
       }
 
       if (loansData.length === 0) {
