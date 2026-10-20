@@ -474,6 +474,19 @@
       align-items: center;
       gap: 6px;
     }
+    .btn-edit-icon {
+      font-size: 0.8rem;
+      cursor: pointer;
+      opacity: 0.65;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity 0.2s, background 0.2s;
+      user-select: none;
+    }
+    .btn-edit-icon:active {
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.15);
+    }
     .loan-date-badge {
       font-size: 0.72rem;
       color: var(--text-muted);
@@ -968,6 +981,47 @@
         <!-- Summary will go here -->
       </div>
       <button type="button" id="closeModalBtn" class="close-btn">ตกลง</button>
+    </div>
+  </div>
+
+  <!-- Edit Loan Modal -->
+  <div id="loanEditModal" class="modal">
+    <div class="modal-content" style="text-align: left; max-width: 360px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.2rem; margin: 0; background: linear-gradient(135deg, #f59e0b, #d97706); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✏️ แก้ไขรายการยืม</h2>
+        <span onclick="closeEditLoanModal()" style="font-size: 1.3rem; color: #94a3b8; cursor: pointer; padding: 0 4px; line-height: 1;">✕</span>
+      </div>
+
+      <input type="hidden" id="edit_loan_id">
+
+      <div class="form-group">
+        <label>วันที่ยืม (Date)</label>
+        <input type="date" id="edit_loan_date" required>
+      </div>
+
+      <div class="form-group">
+        <label>ชื่อคนยืม (Name)</label>
+        <input type="text" id="edit_loan_person" required autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label>ยอดเงินคงค้าง (Amount)</label>
+        <input type="number" id="edit_loan_amount" step="1" inputmode="numeric" required>
+      </div>
+
+      <div class="form-group">
+        <label>หมายเหตุ (Note)</label>
+        <input type="text" id="edit_loan_note" autocomplete="off">
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; margin-top: 1.2rem;">
+        <button type="button" onclick="closeEditLoanModal()" style="flex: 1; padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border); background: rgba(15,23,42,0.6); color: var(--text-muted); font-weight: 500; cursor: pointer;">
+          ยกเลิก
+        </button>
+        <button type="button" onclick="saveEditedLoan()" class="close-btn" style="flex: 1.5; padding: 0.75rem; background: linear-gradient(135deg, #f59e0b, #d97706);">
+          💾 บันทึก
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1780,6 +1834,7 @@
             <div class="loan-card-header">
               <span class="loan-person-name">
                 <span>👤</span> ${escapeHtml(loan.person)}
+                <span class="btn-edit-icon" onclick="openEditLoanModal('${loan.id}')" title="แก้ไขรายการ">✏️</span>
               </span>
               <span class="loan-date-badge">ยืมเมื่อ ${shortDate}</span>
             </div>
@@ -2042,6 +2097,55 @@
         saveLoansData();
         syncLoansToGAS();
       }
+    }
+
+    // ฟังก์ชันเปิด-ปิดและบันทึกแก้ไขรายการยืม
+    function openEditLoanModal(id) {
+      const loan = loansData.find(l => l.id === id);
+      if (!loan) return;
+
+      document.getElementById('edit_loan_id').value = loan.id;
+      document.getElementById('edit_loan_date').value = loan.date || getLocalDateString();
+      document.getElementById('edit_loan_person').value = loan.person || '';
+      document.getElementById('edit_loan_amount').value = loan.amount || 0;
+      document.getElementById('edit_loan_note').value = loan.note || '';
+
+      document.getElementById('loanEditModal').style.display = 'flex';
+    }
+
+    function closeEditLoanModal() {
+      const modal = document.getElementById('loanEditModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function saveEditedLoan() {
+      const id = document.getElementById('edit_loan_id').value;
+      const idx = loansData.findIndex(l => l.id === id);
+      if (idx === -1) return;
+
+      const date = document.getElementById('edit_loan_date').value;
+      const person = document.getElementById('edit_loan_person').value.trim();
+      const amount = parseFloat(document.getElementById('edit_loan_amount').value) || 0;
+      const note = document.getElementById('edit_loan_note').value.trim();
+
+      if (!person) {
+        alert('กรุณากรอกชื่อคนยืม');
+        return;
+      }
+      if (amount <= 0) {
+        alert('กรุณาระบุจำนวนเงินที่มากกว่า 0');
+        return;
+      }
+
+      loansData[idx].date = date;
+      loansData[idx].person = person;
+      loansData[idx].amount = amount;
+      loansData[idx].note = note;
+      loansData[idx].updatedAt = getBangkokNowString();
+
+      saveLoansData();
+      syncLoansToGAS();
+      closeEditLoanModal();
     }
 
     // ซิงค์รายการยืม-คืนกับ Google Sheet
