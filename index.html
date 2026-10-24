@@ -95,6 +95,50 @@
       box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
     }
 
+    /* Last Recorded Expense Reminder Bar */
+    .last-expense-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 0.42rem 0.7rem;
+      margin-bottom: 0.85rem;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+    .last-expense-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      overflow: hidden;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .last-expense-item {
+      color: #e2e8f0;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .last-expense-time {
+      color: #64748b;
+      font-size: 0.7rem;
+      flex-shrink: 0;
+    }
+    .last-expense-amount {
+      color: #34d399;
+      font-weight: 600;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      font-feature-settings: "tnum";
+      flex-shrink: 0;
+    }
+
     .form-group { margin-bottom: 1.1rem; }
     .form-row { display: flex; gap: 0.75rem; }
     .form-row .form-group { flex: 1; }
@@ -721,6 +765,16 @@
     <!-- Tab 1: บันทึกรายจ่ายด่วน -->
     <div id="expense-tab-content" class="tab-content active">
       <form id="expenseForm">
+        <!-- แถบเตือนความจำรายการบันทึกล่าสุด -->
+        <div id="last-expense-reminder" class="last-expense-bar">
+          <div class="last-expense-info">
+            <span style="flex-shrink: 0;">🕒 ล่าสุด:</span>
+            <span id="last-expense-text" class="last-expense-item">ยังไม่มีประวัติในเครื่องนี้</span>
+            <span id="last-expense-time" class="last-expense-time"></span>
+          </div>
+          <div id="last-expense-amount" class="last-expense-amount"></div>
+        </div>
+
         <div class="form-group">
           <label>วันที่ (Date)</label>
           <input type="date" id="date" required>
@@ -1400,6 +1454,7 @@
         })
         .then(function(text) {
           setGlobalSyncStatus('idle', 'บันทึกสำเร็จเรียบร้อย');
+          saveLastExpenseReminder(data);
 
           var summaryHtml = 
             '<b>ประเภท:</b> รายจ่ายด่วน<br>' +
@@ -1424,6 +1479,7 @@
             if (errorEl) errorEl.style.display = 'none';
             submitBtn.disabled = false;
             submitBtn.textContent = 'บันทึกรายจ่าย';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
           };
         })
@@ -2588,9 +2644,68 @@
       localStorage.removeItem('capitalflow_sync_lock');
     } catch (e) {}
 
+    // ==========================================
+    // Last Recorded Expense Reminder (localStorage)
+    // ==========================================
+    function formatExpenseShortTime(savedAtStr, dateStr) {
+      const shortD = formatShortDate(dateStr || getLocalDateString());
+      if (savedAtStr && savedAtStr.includes(' ')) {
+        const timePart = savedAtStr.split(' ')[1];
+        return `(${shortD} ${timePart})`;
+      }
+      return shortD ? `(${shortD})` : '';
+    }
+
+    function renderLastExpenseReminder() {
+      const textEl = document.getElementById('last-expense-text');
+      const timeEl = document.getElementById('last-expense-time');
+      const amtEl = document.getElementById('last-expense-amount');
+      if (!textEl || !timeEl || !amtEl) return;
+
+      try {
+        const raw = localStorage.getItem('capitalflow_last_expense');
+        if (!raw) {
+          textEl.textContent = 'ยังไม่มีประวัติในเครื่องนี้';
+          textEl.style.color = '#64748b';
+          timeEl.textContent = '';
+          amtEl.textContent = '';
+          return;
+        }
+        const rec = JSON.parse(raw);
+        const itemLabel = (rec.item && rec.item !== rec.category)
+          ? `${rec.item}`
+          : (rec.category || rec.item || '-');
+        textEl.textContent = itemLabel;
+        textEl.style.color = '#e2e8f0';
+        timeEl.textContent = formatExpenseShortTime(rec.savedAt, rec.date);
+        const numAmt = Number(rec.amount) || 0;
+        const formattedAmt = numAmt % 1 === 0
+          ? numAmt.toLocaleString('en-US')
+          : numAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        amtEl.textContent = `฿${formattedAmt}`;
+      } catch (e) {}
+    }
+
+    function saveLastExpenseReminder(data) {
+      try {
+        const displayItem = (data.category === 'น้ำมัน') ? 'น้ำมัน NMAX' : (data.item || data.category);
+        const record = {
+          item: displayItem,
+          category: data.category,
+          type: data.type,
+          amount: Number(data.amount) || 0,
+          date: data.date,
+          savedAt: getBangkokNowString()
+        };
+        localStorage.setItem('capitalflow_last_expense', JSON.stringify(record));
+        renderLastExpenseReminder();
+      } catch (e) {}
+    }
+
     // เริ่มต้น Pre-warm และโหลดแคชทันทีเมื่อเปิดหน้าเว็บ
     prewarmGAS();
     setGlobalSyncStatus('idle', 'พร้อมใช้งาน (เชื่อมต่อ Google Sheet)');
+    renderLastExpenseReminder();
     loadCachedAomAm();
     loadCachedLoans();
     fetchLoansFromGAS();
