@@ -17,6 +17,9 @@
       --border: rgba(255,255,255,0.1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+    html, body {
+      overscroll-behavior-y: contain;
+    }
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
@@ -25,6 +28,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+    }
+    button, input, select, label, .tab-btn, .tag-chip, .amount-chip, .person-chip, .btn-edit-icon, .global-sync-badge {
+      touch-action: manipulation;
     }
     .container {
       width: 100%;
@@ -158,7 +164,7 @@
       color: var(--text-main);
       font-size: 0.95rem;
       outline: none;
-      transition: all 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
       appearance: none;
     }
     input[readonly] {
@@ -457,21 +463,28 @@
     }
 
     .undo-toast {
-      background: rgba(30, 41, 59, 0.95);
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 2rem);
+      max-width: 400px;
+      z-index: 950;
+      background: rgba(15, 23, 42, 0.95);
       border: 1px solid #10b981;
       border-radius: 12px;
-      padding: 0.65rem 0.85rem;
-      margin-bottom: 1rem;
+      padding: 0.75rem 0.95rem;
       display: none;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
-      animation: slideDown 0.25s ease-out;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(16, 185, 129, 0.3);
+      backdrop-filter: blur(8px);
+      animation: slideUpFloating 0.25s ease-out;
     }
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes slideUpFloating {
+      from { opacity: 0; transform: translate(-50%, 12px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
     }
     .undo-toast-text {
       font-size: 0.82rem;
@@ -502,7 +515,7 @@
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 0.85rem 0.95rem;
-      transition: all 0.2s ease;
+      transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
     }
     .loan-card-header {
       display: flex;
@@ -697,11 +710,15 @@
     }
     .person-chip .remove-person {
       color: #94a3b8;
-      font-size: 0.75rem;
-      padding-left: 2px;
+      font-size: 0.85rem;
+      margin-left: 5px;
+      padding: 0 4px;
+      border-left: 1px solid rgba(255, 255, 255, 0.15);
       font-weight: 700;
+      line-height: 1;
     }
-    .person-chip .remove-person:hover {
+    .person-chip .remove-person:hover,
+    .person-chip .remove-person:active {
       color: #f87171;
     }
 
@@ -1187,23 +1204,27 @@
     // กำหนดวันที่เริ่มต้น
     updateDateDefaults(true);
 
+    // ป้องกันการแตะชิปแล้วดึง Focus ไปจากช่องกรอกข้อมูล ทำให้คีย์บอร์ดหุบลงมาดันจอ
+    document.addEventListener('mousedown', function(e) {
+      if (e.target.closest('.person-chip, .amount-chip, .tag-chip')) {
+        e.preventDefault();
+      }
+    });
+
     // อัปเดตวันที่อัตโนมัติและ Pre-warm Server เมื่อสลับกลับมาที่แท็บ (แก้ปัญหาเปิดแท็บค้างข้ามคืน)
+    let lastVisibilitySyncAt = 0;
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
         updateDateDefaults(false);
         prewarmGAS();
-        const loanTab = document.getElementById('loan-tab-content');
-        if (loanTab && loanTab.classList.contains('active')) {
-          fetchLoansFromGAS();
+        const now = Date.now();
+        if (now - lastVisibilitySyncAt > 15000) {
+          lastVisibilitySyncAt = now;
+          const loanTab = document.getElementById('loan-tab-content');
+          if (loanTab && loanTab.classList.contains('active')) {
+            fetchLoansFromGAS();
+          }
         }
-      }
-    });
-    window.addEventListener('focus', function() {
-      updateDateDefaults(false);
-      prewarmGAS();
-      const loanTab = document.getElementById('loan-tab-content');
-      if (loanTab && loanTab.classList.contains('active')) {
-        fetchLoansFromGAS();
       }
     });
 
@@ -1609,7 +1630,6 @@
       } else {
         noteInput.value = noteInput.value + ' ' + text;
       }
-      noteInput.focus();
     }
 
     function updateAomAmDisplay(data) {
@@ -1800,6 +1820,37 @@
     let loansData = [];
     let lastClearedLoan = null;
     let undoTimer = null;
+    let loanMutationSeq = 0;
+
+    function getLoansFingerprint(loans) {
+      if (!Array.isArray(loans)) return '';
+      return loans.map(l => {
+        const person = (l.person || '').trim().toLowerCase();
+        const amt = Number(l.amount) || 0;
+        const items = Array.isArray(l.items) ? l.items.map(it => `${it.date || ''}_${Number(it.amount) || 0}_${(it.note || '').trim()}`).join(';') : '';
+        const hist = (l.history || '').replace(/<!--ITEMS:[\s\S]*?-->/gi, '').trim();
+        return `${person}:${amt}:${items}:${hist}`;
+      }).sort().join('|');
+    }
+
+    function isUserInteractingWithLoans() {
+      const loanTab = document.getElementById('loan-tab-content');
+      if (!loanTab || !loanTab.classList.contains('active')) return false;
+
+      // Check if edit modal is open
+      const editModal = document.getElementById('loanEditModal');
+      if (editModal && editModal.style.display === 'flex') return true;
+
+      // Check if any partial repayment box is open
+      if (document.querySelector('.loan-partial-box.active')) return true;
+
+      // Check if user is focused inside loan tab inputs
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        if (loanTab.contains(activeEl)) return true;
+      }
+      return false;
+    }
 
     function getBangkokNowString() {
       const d = new Date();
@@ -1961,6 +2012,26 @@
 
       if (!container) return;
 
+      // จดจำกล่องคืนบางส่วนและประวัติการคืนที่ผู้ใช้เปิดค้างไว้ก่อน Re-render
+      const openPartialIds = new Set();
+      const partialValues = {};
+      const partialDates = {};
+      const openHistoryIds = new Set();
+      document.querySelectorAll('.loan-partial-box.active').forEach(box => {
+        const id = box.id.replace('partial-box-', '');
+        openPartialIds.add(id);
+        const input = document.getElementById(`partial-input-${id}`);
+        const dateInput = document.getElementById(`partial-date-${id}`);
+        if (input && input.value) partialValues[id] = input.value;
+        if (dateInput && dateInput.value) partialDates[id] = dateInput.value;
+      });
+      document.querySelectorAll('[id^="history-content-"]').forEach(content => {
+        if (content.style.display === 'flex') {
+          const id = content.id.replace('history-content-', '');
+          openHistoryIds.add(id);
+        }
+      });
+
       const totalAmount = loansData.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
       const count = loansData.length;
 
@@ -2120,6 +2191,26 @@
       });
 
       container.innerHTML = html;
+
+      // คืนค่ากล่องคืนบางส่วนและประวัติการคืนที่เปิดค้างไว้ให้กลับมาเปิดต่ออัตโนมัติ
+      openPartialIds.forEach(id => {
+        const box = document.getElementById(`partial-box-${id}`);
+        if (box) {
+          box.classList.add('active');
+          const input = document.getElementById(`partial-input-${id}`);
+          const dateInput = document.getElementById(`partial-date-${id}`);
+          if (input && partialValues[id]) input.value = partialValues[id];
+          if (dateInput && partialDates[id]) dateInput.value = partialDates[id];
+        }
+      });
+      openHistoryIds.forEach(id => {
+        const content = document.getElementById(`history-content-${id}`);
+        const arrow = document.getElementById(`history-arrow-${id}`);
+        const btn = arrow ? arrow.closest('.btn-toggle-history') : null;
+        if (content) content.style.display = 'flex';
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+        if (btn) btn.style.borderRadius = '8px 8px 0 0';
+      });
     }
 
     function escapeHtml(str) {
@@ -2150,6 +2241,12 @@
       const container = document.getElementById('loan-person-chips');
       if (!container) return;
       const people = getStoredLoanPeople();
+      const peopleKey = JSON.stringify(people);
+      if (container.dataset.renderedPeople === peopleKey) {
+        return; // ไม่ต้อง Re-render ถ้าข้อมูลชื่อเหมือนเดิม
+      }
+      container.dataset.renderedPeople = peopleKey;
+
       if (people.length === 0) {
         container.innerHTML = '';
         return;
@@ -2170,13 +2267,14 @@
       const input = document.getElementById('loan_person');
       if (input) {
         input.value = name;
-        const amountInput = document.getElementById('loan_amount');
-        if (amountInput) amountInput.focus();
       }
     }
 
     function removeLoanPersonChip(name, event) {
       if (event) event.stopPropagation();
+      if (!confirm(`ต้องการลบชื่อ "${name}" ออกจากรายการด่วนใช่หรือไม่?`)) {
+        return;
+      }
       let people = getStoredLoanPeople().filter(p => p !== name);
       saveStoredLoanPeople(people);
     }
@@ -2248,26 +2346,42 @@
         });
       }
 
+      loanMutationSeq++;
       saveLoansData();
       syncLoansToGAS();
 
       // เคลียร์ฟอร์ม
+      document.getElementById('loan_person').value = '';
       document.getElementById('loan_amount').value = '';
       document.getElementById('loan_note').value = '';
       updateDateDefaults(true);
+
+      // หุบคีย์บอร์ดก่อนเลื่อนจอขึ้น เพื่อไม่ให้คีย์บอร์ดค้างตีกับการเลื่อนจอ
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
 
       // เลื่อนจอขึ้นไปดูการ์ด
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // ฟังก์ชันคืนครบ (เคลียร์ออก)
-    function clearLoanFull(id) {
+    function clearLoanFull(id, skipConfirm = false) {
       const idx = loansData.findIndex(l => l.id === id);
       if (idx === -1) return;
 
       const clearedItem = loansData[idx];
+      if (!skipConfirm) {
+        const personName = clearedItem.person || 'รายการนี้';
+        const formattedAmt = (Number(clearedItem.amount) || 0).toLocaleString();
+        if (!confirm(`ยืนยันเคลียร์หนี้ของ "${personName}" (฿${formattedAmt}) ใช่หรือไม่?`)) {
+          return;
+        }
+      }
+
       lastClearedLoan = { ...clearedItem, originalIndex: idx };
       loansData.splice(idx, 1);
+      loanMutationSeq++;
       saveLoansData();
       syncLoansToGAS();
 
@@ -2298,6 +2412,7 @@
       // คืนค่ากลับเข้า loansData
       loansData.splice(lastClearedLoan.originalIndex || 0, 0, lastClearedLoan);
       lastClearedLoan = null;
+      loanMutationSeq++;
       saveLoansData();
       syncLoansToGAS();
     }
@@ -2349,7 +2464,7 @@
         // คืนหมดหรือเกิน -> เคลียร์ครบ (พร้อมบันทึกประวัติวันที่คืนครบ)
         const repHistory = `คืนครบ ${currentAmt.toLocaleString()} (${shortDate})`;
         loansData[idx].history = loansData[idx].history ? `${loansData[idx].history} | ${repHistory}` : repHistory;
-        clearLoanFull(id);
+        clearLoanFull(id, true);
       } else {
         // หักลบยอด
         loansData[idx].amount = currentAmt - repayAmt;
@@ -2357,6 +2472,7 @@
         const repHistory = `คืนแล้ว ${repayAmt.toLocaleString()} (${shortDate})`;
         loansData[idx].history = loansData[idx].history ? `${loansData[idx].history} | ${repHistory}` : repHistory;
 
+        loanMutationSeq++;
         saveLoansData();
         syncLoansToGAS();
       }
@@ -2479,7 +2595,7 @@
 
       if (newItems.length === 0) {
         // ลบทุกยอดออกหมด -> เคลียร์การ์ดนี้ทิ้ง
-        clearLoanFull(id);
+        clearLoanFull(id, true);
         closeEditLoanModal();
         return;
       }
@@ -2502,6 +2618,7 @@
       loansData[idx].note = combinedNotes;
       loansData[idx].updatedAt = getBangkokNowString();
 
+      loanMutationSeq++;
       saveLoansData();
       syncLoansToGAS();
       closeEditLoanModal();
@@ -2571,6 +2688,11 @@
         return;
       }
 
+      // ป้องกันการซิงค์พื้นหลังเขียนทับหน้าจอขณะที่ผู้ใช้กำลังเปิดกล่องคืนบางส่วน/แก้ไข หรือกำลังพิมพ์อยู่
+      if (!isManual && isUserInteractingWithLoans()) {
+        return;
+      }
+
       const processedLoans = cloudLoans.map(loan => {
         let items = Array.isArray(loan.items) ? loan.items : [];
         let cleanHistory = (loan.history || '').trim();
@@ -2601,6 +2723,13 @@
         return normalized;
       });
 
+      // ตรวจสอบ Fingerprint: ถ้าข้อมูลเหมือนเดิมเป๊ะในการซิงค์พื้นหลัง ห้ามสั่ง Re-render DOM ทับ
+      const currentFingerprint = getLoansFingerprint(loansData);
+      const incomingFingerprint = getLoansFingerprint(processedLoans);
+      if (!isManual && currentFingerprint === incomingFingerprint) {
+        return;
+      }
+
       loansData = processedLoans;
       consolidateLoansByPerson();
       saveLoansData();
@@ -2620,9 +2749,13 @@
         setGlobalSyncStatus('loading', 'กำลังดึงข้อมูลล่าสุดจาก Google Sheet...');
       }
 
+      const reqSeq = loanMutationSeq;
       fetch(GAS_URL + '?action=get_loans', { method: 'GET', mode: 'cors' })
         .then(res => res.json())
         .then(resData => {
+          // หากมีการเพิ่ม/ลบรายการในเครื่องขณะที่กำลังรอผล ให้ตัดผลลัพธ์เก่าทิ้งทันที
+          if (reqSeq !== loanMutationSeq || isPushingLoans) return;
+
           if (resData && resData.status === 'success' && Array.isArray(resData.loans)) {
             applyCloudLoans(resData.loans, isManual);
             if (isManual) {
