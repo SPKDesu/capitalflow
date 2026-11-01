@@ -824,6 +824,7 @@
             <option value="ขนม">ขนม</option>
             <option value="น้ำมัน">น้ำมัน</option>
             <option value="เน็ต">เน็ต</option>
+            <option value="ค่าไฟ">ค่าไฟ</option>
             <option value="บริการสตีมมิ่ง">บริการสตีมมิ่ง</option>
             <option value="เครื่องสำอาง">เครื่องสำอาง</option>
             <option value="ตัดผม">ตัดผม</option>
@@ -1295,7 +1296,7 @@
     const catSelect = document.getElementById('category');
 
     const categories = {
-      'รายจ่าย': ['อาหาร', 'เครื่องดื่ม', 'ขนม', 'น้ำมัน', 'เน็ต', 'บริการสตีมมิ่ง', 'เครื่องสำอาง', 'ตัดผม', 'บำรุงรถ', 'รายจ่ายอื่น ๆ'],
+      'รายจ่าย': ['อาหาร', 'เครื่องดื่ม', 'ขนม', 'น้ำมัน', 'เน็ต', 'ค่าไฟ', 'บริการสตีมมิ่ง', 'เครื่องสำอาง', 'ตัดผม', 'บำรุงรถ', 'รายจ่ายอื่น ๆ'],
       'รายได้': ['รายได้คงที่', 'รายได้อื่น ๆ'],
       'เงินออม': ['เงินออมฉุกเฉิน', 'เงินออมทั่วไป'],
       'ลงทุน': ['เงินลงทุน']
@@ -1352,7 +1353,7 @@
       var itemInput = document.getElementById('item');
       var freqSelect = document.getElementById('frequency');
       
-      const autoItemCats = ['อาหาร', 'เครื่องดื่ม', 'ขนม', 'น้ำมัน', 'เน็ต', 'ตัดผม'];
+      const autoItemCats = ['อาหาร', 'เครื่องดื่ม', 'ขนม', 'น้ำมัน', 'เน็ต', 'ค่าไฟ', 'ตัดผม'];
       if (autoItemCats.includes(cat)) {
         itemInput.value = cat;
       } else {
@@ -1361,7 +1362,7 @@
         }
       }
       
-      const fixedCats = ['เน็ต', 'บริการสตีมมิ่ง', 'รายได้คงที่', 'เงินออมฉุกเฉิน', 'เงินลงทุน'];
+      const fixedCats = ['เน็ต', 'ค่าไฟ', 'บริการสตีมมิ่ง', 'รายได้คงที่', 'เงินออมฉุกเฉิน', 'เงินลงทุน'];
       if (fixedCats.includes(cat)) {
         freqSelect.value = 'คงที่';
       } else {
